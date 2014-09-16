@@ -11,13 +11,26 @@
 : ${ISIM_SDK:=/Developer/Platforms/iPhoneSimulator.platform/Developer}
 : ${SDK_VER:=5.0}
 
-
+CONCURRENT_JOBS=4
+BUILD_DBO_ONLY=false
+BUILD_DBO_COMMAND=``
 BOOST_FRAMEWORK_PATH=/Users/tho/git/Garuda/external/boost/ios/framework
 SDK_VER=7.1
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
+
+while getopts ":j:d" opt; do
+    case "$opt" in
+        j) CONCURRENT_JOBS=$OPTARG;;
+        d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND=` && cd ./src/Wt/dbo && make -j${CONCURRENT_JOBS} `;;
+        *) printf '%s\n' "I don't know what that argument is!" ;;
+    esac 
+done
+
+echo "Number of concurrent jobs: ${CONCURRENT_JOBS}"
+echo "Build DBO only? ${BUILD_DBO_ONLY} extra cmd: ${BUILD_DBO_COMMAND}" 
 
 : ${CMAKE:=cmake}
 
@@ -86,7 +99,7 @@ build-armv7()
        -DCMAKE_CXX_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang++ \
        -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe" \
        -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe -DWT_NO_SPIRIT" \
-       ../../ && make ) || abort "Failed building for arm7 architecture"
+       ../../ && make -j${CONCURRENT_JOBS} ${BUILD_DBO_COMMAND}) || abort "Failed building for arm7 architecture"
 }
 
 build-i386()
@@ -98,7 +111,7 @@ build-i386()
        -DCMAKE_CXX_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang++ \
        -DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -miphoneos-version-min=7.0" \
        -DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
-       ../../ && make && make install) || abort "Failed building for simulator"
+       ../../ && make -j${CONCURRENT_JOBS} ${BUILD_DBO_COMMAND} && make install) || abort "Failed building for simulator"
 }
 
 combineLibs()
