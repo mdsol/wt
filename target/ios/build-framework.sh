@@ -14,23 +14,25 @@
 CONCURRENT_JOBS=4
 BUILD_DBO_ONLY=false
 BUILD_DBO_COMMAND=``
-BOOST_FRAMEWORK_PATH=/Users/tho/git/Garuda/external/boost/ios/framework
-SDK_VER=7.1
+BOOST_FRAMEWORK_PATH=/Users/tho/external-libs/boost/ios/framework
+SDK_VER=8.0
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 
-while getopts ":j:d" opt; do
+while getopts ":j:d:J" opt; do
     case "$opt" in
         j) CONCURRENT_JOBS=$OPTARG;;
-        d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND=` && cd ./src/Wt/dbo && make -j${CONCURRENT_JOBS} `;;
+        d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND="cd ./src/Wt/Dbo ";;
         *) printf '%s\n' "I don't know what that argument is!" ;;
     esac 
 done
 
+
+
 echo "Number of concurrent jobs: ${CONCURRENT_JOBS}"
-echo "Build DBO only? ${BUILD_DBO_ONLY} extra cmd: ${BUILD_DBO_COMMAND}" 
+echo "Build DBO only? ${BUILD_DBO_ONLY}"
 
 : ${CMAKE:=cmake}
 
@@ -42,6 +44,7 @@ echo "Build DBO only? ${BUILD_DBO_ONLY} extra cmd: ${BUILD_DBO_COMMAND}"
 BUILD_ARMV6_DIR=$BUILD_DIR/build-armv6
 BUILD_ARMV7_DIR=$BUILD_DIR/build-armv7
 BUILD_I386_DIR=$BUILD_DIR/build-i386
+BUILD_X8664_DIR=$BUILD_DIR/build-x8664
 STAGE_DIR=$BUILD_DIR/stage
 CONFIG_DIR=$BUILD_DIR/etc
 TMP_DIR=$BUILD_DIR/tmp
@@ -75,11 +78,13 @@ clean()
     rm -rf $BUILD_ARMV6_DIR
     rm -rf $BUILD_ARMV7_DIR
     rm -rf $BUILD_I386_DIR
+    rm -rf $BUILD_X8664_DIR
     rm -rf $TMP_DIR
 }
 
 build-armv6()
 {
+    rm -rf $BUILD_X8664_DIR
    [ -d $BUILD_ARMV6_DIR ] || mkdir -p $BUILD_ARMV6_DIR
    ( cd $BUILD_ARMV6_DIR; ${CMAKE} \
        $COMMON_CMAKE_FLAGS \
@@ -99,7 +104,8 @@ build-armv7()
        -DCMAKE_CXX_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang++ \
        -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe" \
        -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe -DWT_NO_SPIRIT" \
-       ../../ && make -j${CONCURRENT_JOBS} ${BUILD_DBO_COMMAND}) || abort "Failed building for arm7 architecture"
+       -DCMAKE_OSX_SYSROOT=${IOS_SDK}/SDKs/iPhoneOS${SDK_VER}.sdk \
+       ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS}) || abort "Failed building for arm7 architecture"
 }
 
 build-i386()
@@ -109,9 +115,31 @@ build-i386()
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -miphoneos-version-min=7.0" \
-       -DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
-       ../../ && make -j${CONCURRENT_JOBS} ${BUILD_DBO_COMMAND} && make install) || abort "Failed building for simulator"
+       -DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=7.0" \
+       -DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
+       -DCMAKE_OSX_SYSROOT=${ISIM_SDK}/SDKs/iPhoneSimulator${SDK_VER}.sdk \
+       ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS} && make install) || abort "Failed building for simulator"
+
+	# Backup C/CXX FLAGS
+       #-DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -miphoneos-version-min=7.0" \
+       #-DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
+}
+
+build-x8664()
+{
+   [ -d $BUILD_X8664_DIR ] || mkdir -p $BUILD_X8664_DIR
+   ( cd $BUILD_X8664_DIR; ${CMAKE} \
+       $COMMON_CMAKE_FLAGS \
+       -DCMAKE_C_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang \
+       -DCMAKE_CXX_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang++ \
+       -DCMAKE_C_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=7.0" \
+       -DCMAKE_CXX_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
+       -DCMAKE_OSX_SYSROOT=${ISIM_SDK}/SDKs/iPhoneSimulator${SDK_VER}.sdk \
+       ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS} && make install) || abort "Failed building for simulator"
+
+	# Backup C/CXX FLAGS
+       #-DCMAKE_C_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -miphoneos-version-min=7.0" \
+       #-DCMAKE_CXX_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator${SDK_VER}.sdk -DWT_NO_SPIRIT -miphoneos-version-min=7.0" \
 }
 
 combineLibs()
@@ -119,9 +147,11 @@ combineLibs()
     : ${1:?}
     BUILD_DIR=$1
     [ -d $TMP_DIR ] || mkdir -p $TMP_DIR
+    if [ $BUILD_DBO_ONLY != true ] ; then
     ( mkdir -p $TMP_DIR/http &&
 	cd $TMP_DIR/http &&
 	ar x $BUILD_DIR/src/http/libwthttp.a ) || abort "Extract libwthttp.a failed"
+    fi
     ( mkdir -p $TMP_DIR/dbosqlite3 &&
 	cd $TMP_DIR/dbosqlite3 &&
         ar x $BUILD_DIR/src/Wt/Dbo/backend/libwtdbosqlite3.a sqlite3.o &&
@@ -130,9 +160,14 @@ combineLibs()
     ( mkdir -p $TMP_DIR/dbo &&
 	cd $TMP_DIR/dbo &&
         ar x $BUILD_DIR/src/Wt/Dbo/libwtdbo.a) || abort "Extract libwtdbo.a failed"
+    if [ $BUILD_DBO_ONLY != true ] ; then
     ( cd $TMP_DIR
 	ar x $BUILD_DIR/src/libwt.a &&
 	ar -rcs $BUILD_DIR/Wt.a *.o */*.o)  || abort "Combine libs $1 failed."
+    else
+    ( cd $TMP_DIR
+	ar -rcs $BUILD_DIR/Wt.a */*.o)  || abort "Combine libs $1 failed."
+    fi
     rm -rf $TMP_DIR
 }
 
@@ -168,6 +203,7 @@ createFramework()
     lipo -create \
 	-arch armv7 build-armv7/Wt.a \
 	-arch i386 build-i386/Wt.a \
+	-arch x86_64 build-x8664/Wt.a \
 	-o $FRAMEWORK_INSTALL_NAME || abort "lipo failed"
 
     echo "Framework: Copying headers..."
@@ -202,7 +238,9 @@ clean
 #build-armv6
 build-armv7
 build-i386
+build-x8664
 #combineLibs $BUILD_ARMV6_DIR
 combineLibs $BUILD_ARMV7_DIR
 combineLibs $BUILD_I386_DIR
+combineLibs $BUILD_X8664_DIR
 createFramework
