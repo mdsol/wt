@@ -14,8 +14,6 @@
 CONCURRENT_JOBS=4
 BUILD_DBO_ONLY=false
 BUILD_DBO_COMMAND=``
-BUILD_JSON_ONLY=false
-BUILD_JSON_COMMAND=``
 BOOST_FRAMEWORK_PATH=/Users/tho/external-libs/boost/ios/framework
 SDK_VER=8.0
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
@@ -26,15 +24,15 @@ IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 while getopts ":j:d:J" opt; do
     case "$opt" in
         j) CONCURRENT_JOBS=$OPTARG;;
-        d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND=" cd ./src/Wt/Dbo && make -j${CONCURRENT_JOBS} ";;
-        d) BUILD_JSON_ONLY=true; BUILD_JSON_COMMAND=` && cd ./src/Wt/Json && make -j${CONCURRENT_JOBS} `;;
+        d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND="cd ./src/Wt/Dbo ";;
         *) printf '%s\n' "I don't know what that argument is!" ;;
     esac 
 done
 
+
+
 echo "Number of concurrent jobs: ${CONCURRENT_JOBS}"
 echo "Build DBO only? ${BUILD_DBO_ONLY}"
-echo "Build JSON only? ${BUILD_JSON_ONLY}"
 
 : ${CMAKE:=cmake}
 
@@ -80,11 +78,13 @@ clean()
     rm -rf $BUILD_ARMV6_DIR
     rm -rf $BUILD_ARMV7_DIR
     rm -rf $BUILD_I386_DIR
+    rm -rf $BUILD_X8664_DIR
     rm -rf $TMP_DIR
 }
 
 build-armv6()
 {
+    rm -rf $BUILD_X8664_DIR
    [ -d $BUILD_ARMV6_DIR ] || mkdir -p $BUILD_ARMV6_DIR
    ( cd $BUILD_ARMV6_DIR; ${CMAKE} \
        $COMMON_CMAKE_FLAGS \
@@ -147,9 +147,11 @@ combineLibs()
     : ${1:?}
     BUILD_DIR=$1
     [ -d $TMP_DIR ] || mkdir -p $TMP_DIR
+    if [ $BUILD_DBO_ONLY != true ] ; then
     ( mkdir -p $TMP_DIR/http &&
 	cd $TMP_DIR/http &&
 	ar x $BUILD_DIR/src/http/libwthttp.a ) || abort "Extract libwthttp.a failed"
+    fi
     ( mkdir -p $TMP_DIR/dbosqlite3 &&
 	cd $TMP_DIR/dbosqlite3 &&
         ar x $BUILD_DIR/src/Wt/Dbo/backend/libwtdbosqlite3.a sqlite3.o &&
@@ -158,9 +160,14 @@ combineLibs()
     ( mkdir -p $TMP_DIR/dbo &&
 	cd $TMP_DIR/dbo &&
         ar x $BUILD_DIR/src/Wt/Dbo/libwtdbo.a) || abort "Extract libwtdbo.a failed"
+    if [ $BUILD_DBO_ONLY != true ] ; then
     ( cd $TMP_DIR
 	ar x $BUILD_DIR/src/libwt.a &&
 	ar -rcs $BUILD_DIR/Wt.a *.o */*.o)  || abort "Combine libs $1 failed."
+    else
+    ( cd $TMP_DIR
+	ar -rcs $BUILD_DIR/Wt.a */*.o)  || abort "Combine libs $1 failed."
+    fi
     rm -rf $TMP_DIR
 }
 
@@ -227,7 +234,7 @@ createFramework()
 EOF
 }
 
-clean
+#clean
 #build-armv6
 build-armv7
 build-i386
