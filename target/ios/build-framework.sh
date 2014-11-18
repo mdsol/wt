@@ -15,13 +15,13 @@ CONCURRENT_JOBS=4
 BUILD_DBO_ONLY=false
 BUILD_DBO_COMMAND=``
 BOOST_FRAMEWORK_PATH=/Users/tho/external-libs/boost/ios/framework
-SDK_VER=8.0
+SDK_VER=8.1
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
 
-while getopts ":j:d:J" opt; do
+while getopts "j:d" opt; do
     case "$opt" in
         j) CONCURRENT_JOBS=$OPTARG;;
         d) BUILD_DBO_ONLY=true; BUILD_DBO_COMMAND="cd ./src/Wt/Dbo ";;
@@ -32,7 +32,7 @@ done
 
 
 echo "Number of concurrent jobs: ${CONCURRENT_JOBS}"
-echo "Build DBO only? ${BUILD_DBO_ONLY}"
+echo "Build DBO only? ${BUILD_DBO_ONLY}: ${BUILD_DBO_COMMAND}"
 
 : ${CMAKE:=cmake}
 
