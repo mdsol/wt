@@ -135,7 +135,7 @@ std::string cssCamelNames_[] =
     "boxSizing" 
   };
 
-const std::string unsafeChars_ = " $&+,:;=?@'\"<>#%{}|\\^~[]`";
+const std::string unsafeChars_ = " $&+,:;=?@'\"<>#%{}|\\^~[]`/";
 
 inline char hexLookup(int n) {
   return "0123456789abcdef"[(n & 0xF)];
@@ -328,7 +328,6 @@ void DomElement::setEvent(const char *eventName,
   if (isExposed || anchorClick || !jsCode.empty()) {
     js << "var e=event||window.event,";
     js << "o=this;";
-    js << "var a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;";
 
     if (anchorClick)
       js << "if(e.ctrlKey||e.metaKey||(" WT_CLASS ".button(e) > 1))"
@@ -381,8 +380,6 @@ void DomElement::setEvent(const char *eventName,
   for (unsigned i = 0; i < actions.size(); ++i) {
     if (!actions[i].jsCondition.empty())
       code << "if(" << actions[i].jsCondition << "){";
-
-    code << "var a1 = null, a2 = null, a3 = null, a4 = null, a5 = null, a6 = null;";
 
     /*
      * This order, first JavaScript and then event propagation is important
@@ -733,7 +730,7 @@ void DomElement::asHTML(EscapeOStream& out,
   bool needButtonWrap
     = (!app->environment().ajax()
        && (clickEvent != eventHandlers_.end())
-       && (!clickEvent->second.jsCode.empty())
+       && (!clickEvent->second.signalName.empty())
        && (!app->environment().agentIsSpiderBot()));
 
   bool isSubmit = needButtonWrap;
@@ -853,6 +850,13 @@ void DomElement::asHTML(EscapeOStream& out,
       PropertyMap::const_iterator i = properties_.find(PropertyDisabled);
       if ((i != properties_.end()) && (i->second=="true"))
 	out << " disabled=\"disabled\"";
+
+      for (AttributeMap::const_iterator j = attributes_.begin();
+	   j != attributes_.end(); ++j)
+	if (j->first == "title") {
+	  out << ' ' << j->first << '=';
+	  fastHtmlAttributeValue(out, attributeValues, j->second);
+	}
 
       if (app->environment().agent() != WEnvironment::Konqueror
 	  && !app->environment().agentIsWebKit()
@@ -1373,10 +1377,24 @@ std::string DomElement::asJavaScript(EscapeOStream& out,
 void DomElement::renderInnerHtmlJS(EscapeOStream& out, WApplication *app) const
 {
   if (!childrenHtml_.empty() || (wasEmpty_ && canWriteInnerHTML(app))) {
+    std::string innerHTML;
+
+    if (!properties_.empty()) {
+      PropertyMap::const_iterator i = properties_.find(PropertyInnerHTML);
+      if (i != properties_.end()) {
+	innerHTML += i->second;
+      }
+      i = properties_.find(PropertyAddedInnerHTML);
+      if (i != properties_.end()) {
+	innerHTML += i->second;
+      }
+    }
+
     // IE6: write &nbsp; inside a empty <div></div>
     if ((type_ == DomElement_DIV
 	 && app->environment().agent() == WEnvironment::IE6)
-	|| !childrenToAdd_.empty() || !childrenHtml_.empty()) {
+	|| !childrenToAdd_.empty() || !childrenHtml_.empty()
+	|| !innerHTML.empty()) {
       declare(out);
 
       out << WT_CLASS ".setHtml(" << var_ << ",'";
@@ -1387,18 +1405,6 @@ void DomElement::renderInnerHtmlJS(EscapeOStream& out, WApplication *app) const
 
       for (unsigned i = 0; i < childrenToAdd_.size(); ++i)
 	childrenToAdd_[i].child->asHTML(out, js, timeouts);
-
-      std::string innerHTML;
-      {
-	PropertyMap::const_iterator i = properties_.find(PropertyInnerHTML);
-	if (i != properties_.end()) {
-	  innerHTML += i->second;
-	}
-	i = properties_.find(PropertyAddedInnerHTML);
-	if (i != properties_.end()) {
-	  innerHTML += i->second;
-	}
-      }
 
       out << innerHTML;
 

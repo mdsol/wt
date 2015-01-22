@@ -93,25 +93,22 @@ WCanvasPaintDevice::WCanvasPaintDevice(const WLength& width,
     busyWithPath_(false),
     fontMetrics_(0)
 { 
-  textMethod_ = DomText;
+  textMethod_ = Html5Text;
 
   WApplication *app = WApplication::instance();
 
   if (app) {
-    if (app->environment().agentIsIE()) {
-      textMethod_ = Html5Text;
-    } else if (app->environment().agentIsChrome()) {
-      if (app->environment().agent() >= WEnvironment::Chrome2
-	  && !app->environment().agentIsMobileWebKit())
-	textMethod_ = Html5Text;
+    if (app->environment().agentIsChrome()) {
+      if (app->environment().agent() <= WEnvironment::Chrome2)
+	textMethod_ = DomText;
     } else if (app->environment().agentIsGecko()) {
-      if (app->environment().agent() >= WEnvironment::Firefox3_5)
-	textMethod_ = Html5Text;
-      else if (app->environment().agent() >= WEnvironment::Firefox3_0)
+      if (app->environment().agent() < WEnvironment::Firefox3_0)
+	textMethod_ = DomText;
+      else if (app->environment().agent() < WEnvironment::Firefox3_5)
 	textMethod_ = MozText;
     } else if (app->environment().agentIsSafari()) {
-      if (app->environment().agent() >= WEnvironment::Safari4)
-	textMethod_ = Html5Text;
+      if (app->environment().agent() == WEnvironment::Safari3)
+	textMethod_ = DomText;
     }
   }
 }
@@ -346,7 +343,7 @@ void WCanvasPaintDevice::drawPlainPath(std::stringstream& out,
       out << Utils::round_js_str(s.y() + pathTranslation_.y(), 3, buf);
       break;
     case WPainterPath::Segment::ArcR:
-      out << ',' << Utils::round_js_str(s.x(), 3, buf);
+      out << ',' << Utils::round_js_str(std::max(0.0, s.x()), 3, buf);
       break;
     case WPainterPath::Segment::ArcAngleSweep:
       {
@@ -825,6 +822,9 @@ void WCanvasPaintDevice::renderStateChanges(bool resetPathTranslation)
 
   if (penChanged) {
     if (penColorChanged) {
+      // prevent infinite recursion by applying new color to old pen
+      currentPen_.setColor(painter()->pen().color());
+      currentPen_.setGradient(painter()->pen().gradient());
       if (!painter()->pen().gradient().isEmpty()) {
 	std::string gradientName = defineGradient(painter()->pen().gradient(),
 						  js_);

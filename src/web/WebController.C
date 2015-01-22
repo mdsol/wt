@@ -591,7 +591,8 @@ void WebController::handleRequest(WebRequest *request)
   }
 
   if (request->entryPoint_->type() == StaticResource) {
-    request->entryPoint_->resource()->handle(request, (WebResponse *)request);
+    request
+      ->entryPoint_->resource()->handle(request, (WebResponse *)request);
     return;
   }
 
@@ -814,7 +815,7 @@ bool WebController::limitPlainHtmlSessions()
 
     if (plainHtmlSessions_ + ajaxSessions_ > 20)
       return plainHtmlSessions_ > conf_.maxPlainSessionsRatio()
-	* ajaxSessions_;
+	* (ajaxSessions_ + plainHtmlSessions_);
     else
       return false;
   } else

@@ -457,15 +457,15 @@ WT_DECLARE_WT_MEMBER
 	   if (!item.margin)
 	     item.margin = [];
 
-	   if (isHidden(item.w)) {
-	     item.ps[dir] = item.ms[dir] = 0;
-	     continue;
-	   }
-
 	   var first = !item.set;
 
 	   if (!item.set)
 	     item.set = [false, false];
+
+	   if (isHidden(item.w)) {
+	     item.ps[dir] = item.ms[dir] = 0;
+	     continue;
+	   }
 
 	   if (item.w) {
 	     if (WT.isIE)
@@ -1340,7 +1340,7 @@ WT_DECLARE_WT_MEMBER
 		 if (item.set)
 		   item.set[dir] = false;
 	       } else if (dir == HORIZONTAL)
-		 setCss(w, DC.size, item.fs[dir] + 'px');
+		 setCss(w, DC.size, (item.fs[dir] - m) + 'px');
 	     }
 
 	     off = left;
@@ -1479,23 +1479,23 @@ WT_DECLARE_WT_MEMBER
      var colCount = DirConfig[HORIZONTAL].config.length;
      for (i = 0, il = items.length; i < il; ++i) {
        var row = items[i][0], col = items[i][1];
-
        var item = config.items[row * colCount + col];
 
-       item.dirty = 2;
+       if (item) {
+	 item.dirty = 2;
+	 /*
+	  * When the item contains a layout, a change may also impact this:
+	  * it could become a different layout (e.g. WStackedWidget) or
+	  * a hidden layout (e.g. WPanel). Assume in general that it could
+	  * be the case that we need to reset the layout-based size, but don't
+	  * do it yet since it causes flicker when nothing drastic changed.
+	  */
+	 if (item.layout) {
+	   item.layout = false;
+	   item.wasLayout = true;
 
-       /*
-	* When the item contains a layout, a change may also impact this:
-	* it could become a different layout (e.g. WStackedWidget) or
-	* a hidden layout (e.g. WPanel). Assume in general that it could
-	* be the case that we need to reset the layout-based size, but don't
-	* do it yet since it causes flicker when nothing drastic changed.
-	*/
-       if (item.layout) {
-	 item.layout = false;
-	 item.wasLayout = true;
-
-	 APP.layouts2.setChildLayoutsDirty(self, item.w);
+	   APP.layouts2.setChildLayoutsDirty(self, item.w);
+	 }
        }
      }
 

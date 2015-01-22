@@ -450,7 +450,7 @@ std::string WebSession::bootstrapUrl(const WebResponse& response,
 
     if (useUglyInternalPaths()) {
       if (internalPath.length() > 1)
-	url = "?_=" + DomElement::urlEncodeS(internalPath, "#");
+	url = "?_=" + DomElement::urlEncodeS(internalPath, "#/");
 
       if (isAbsoluteUrl(applicationUrl_))
 	url = applicationUrl_ + url;
@@ -530,7 +530,7 @@ std::string WebSession::fixRelativeUrl(const std::string& url) const
        *  - we are a plain HTML session. but then we are not hashing internal
        *    paths, so first condition should never be met
        */
-      if (env_->hashInternalPaths())
+      if (env_->internalPathUsingFragments())
 	return url;
       else {
 	std::string rel = "";
@@ -620,12 +620,12 @@ std::string WebSession::appendInternalPath(const std::string& baseUrl,
       return baseUrl;
   else {
     if (useUglyInternalPaths())
-      return baseUrl + "?_=" + DomElement::urlEncodeS(internalPath, "#");
+      return baseUrl + "?_=" + DomElement::urlEncodeS(internalPath, "#/");
     else {
       if (applicationName_.empty())
-	return baseUrl + DomElement::urlEncodeS(internalPath.substr(1), "#");
+	return baseUrl + DomElement::urlEncodeS(internalPath.substr(1), "#/");
       else
-	return baseUrl + DomElement::urlEncodeS(internalPath, "#");
+	return baseUrl + DomElement::urlEncodeS(internalPath, "#/");
     }
   }
 }
@@ -969,8 +969,8 @@ void WebSession::processQueuedEvents(WebSession::Handler& handler)
 	if (app() && app()->isQuited())
 	  kill();
 
-	// if (dead())
-	//   controller.removeSession(event.sessionId);
+	if (dead())
+	  controller()->removeSession(event.sessionId);
       } else {
 	if (event.fallbackFunction)
 	  WT_CALL_FUNCTION(event.fallbackFunction);
