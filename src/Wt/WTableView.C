@@ -160,19 +160,10 @@ WTableView::WTableView(WContainerWidget *parent)
     layout->setColumnStretch(1, 1);
 
     impl_->setLayout(layout);
-
-    app->addAutoJavaScript
-      ("{var obj = $('#" + id() + "').data('obj');"
-       "if (obj) obj.autoJavaScript();}");
-
-    connectObjJS(canvas_->mouseWentDown(), "mouseDown");
-
-    /* Two-lines needed for WT_PORT */
-    EventSignalBase& ccScrolled = contentsContainer_->scrolled();
-    connectObjJS(ccScrolled, "onContentsContainerScroll");
   } else {
     plainTable_ = new WTable();
     plainTable_->setStyleClass("Wt-plaintable");
+    plainTable_->setAttributeValue("style", "table-layout: fixed;");
     plainTable_->setHeaderCount(1);
 
     impl_->addWidget(plainTable_);
@@ -752,6 +743,18 @@ void WTableView::defineJavaScript()
       << "}";
     contentsContainer_->setJavaScriptMember(WT_RESIZE_JS, s.str());
   }
+
+  if (canvas_) {
+    app->addAutoJavaScript
+      ("{var obj = $('#" + id() + "').data('obj');"
+       "if (obj) obj.autoJavaScript();}");
+  
+    connectObjJS(canvas_->mouseWentDown(), "mouseDown");
+
+    /* Two-lines needed for WT_PORT */
+    EventSignalBase& ccScrolled = contentsContainer_->scrolled();
+    connectObjJS(ccScrolled, "onContentsContainerScroll");
+  }
 }
 
 void WTableView::render(WFlags<RenderFlag> flags)
@@ -793,6 +796,8 @@ void WTableView::render(WFlags<RenderFlag> flags)
       case NeedRerenderData:
 	rerenderData();
 	break;
+      case NeedUpdateModelIndexes:
+	updateModelIndexes();
       case NeedAdjustViewPort:
 	adjustToViewport();
 	break;
@@ -802,6 +807,53 @@ void WTableView::render(WFlags<RenderFlag> flags)
     }
 
   WAbstractItemView::render(flags);
+}
+
+void WTableView::updateModelIndexes()
+{
+  int row1 = firstRow();
+  int row2 = lastRow();
+  int col1 = firstColumn();
+  int col2 = lastColumn();
+
+  for (int i = row1; i <= row2; ++i) {
+    int renderedRow = i - firstRow();
+
+    int rhc = ajaxMode() ? rowHeaderCount() : 0;
+
+    for (int j = 0; j < rhc; ++j) {
+      int renderedColumn = j;
+
+      WModelIndex index = model()->index(i, j, rootIndex());
+      updateModelIndex(index, renderedRow, renderedColumn);
+    }
+
+    for (int j = col1; j <= col2; ++j) {
+      int renderedColumn = rhc + j - firstColumn();
+
+      WModelIndex index = model()->index(i, j, rootIndex());
+      updateModelIndex(index, renderedRow, renderedColumn);
+    }
+  }
+}
+
+void WTableView::updateModelIndex(const WModelIndex& index,
+				  int renderedRow, int renderedColumn)
+{
+  WContainerWidget *parentWidget;
+  int wIndex;
+
+  if (ajaxMode()) {
+    parentWidget = columnContainer(renderedColumn);
+    wIndex = renderedRow;
+  } else {
+    parentWidget = plainTable_->elementAt(renderedRow + 1, renderedColumn);
+    wIndex = 0;
+  }
+
+  WAbstractItemDelegate *itemDelegate = this->itemDelegate(index.column());
+  WWidget *widget = parentWidget->widget(wIndex);
+  itemDelegate->updateModelIndex(widget, index);
 }
 
 void WTableView::rerenderData()
@@ -1069,11 +1121,9 @@ void WTableView::setRowHeight(const WLength& rowHeight)
 
   WAbstractItemView::setRowHeight(rowHeight);
 
-  std::string lh = "line-height: " + rowHeight.cssText();
-
   if (ajaxMode()) {
-    canvas_->setAttributeValue("style", lh);
-    headerColumnsCanvas_->setAttributeValue("style", lh);
+    canvas_->setLineHeight(rowHeight);
+    headerColumnsCanvas_->setLineHeight(rowHeight);
 
     if (model()) {
       double ch = canvasHeight();
@@ -1083,7 +1133,7 @@ void WTableView::setRowHeight(const WLength& rowHeight)
       setRenderedHeight(th);
     }
   } else { // Plain HTML mode
-    plainTable_->setAttributeValue("style", lh + ";table-layout: fixed;");
+    plainTable_->setLineHeight(rowHeight);
     resize(width(), height());
   }
 
@@ -1341,8 +1391,10 @@ void WTableView::modelRowsRemoved(const WModelIndex& parent, int start, int end)
 
       setSpannerCount(Bottom, spannerCount(Bottom) + toRemove);
     }
-  } else if (start <= lastRow())
-    scheduleRerender(NeedRerenderData);
+  }
+
+  if (start <= lastRow())
+    scheduleRerender(NeedUpdateModelIndexes);
 
   computeRenderedArea();
   adjustSize();

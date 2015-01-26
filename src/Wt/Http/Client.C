@@ -43,7 +43,6 @@ class Client::Impl : public boost::enable_shared_from_this<Client::Impl>
 public:
   struct ChunkState {
     enum State { Size, Data, Complete, Error } state;
-    WStringStream *data;
     std::size_t size;
     int parsePos;
   };
@@ -104,7 +103,8 @@ public:
 
     startTimer();
     resolver_.async_resolve(query,
-			    boost::bind(&Impl::handleResolve, this,
+			    boost::bind(&Impl::handleResolve,
+					shared_from_this(),
 					boost::asio::placeholders::error,
 					boost::asio::placeholders::iterator));
   }
@@ -119,6 +119,8 @@ public:
   }
 
   Signal<boost::system::error_code, Message>& done() { return done_; }
+  Signal<Message>& headersReceived() { return headersReceived_; }
+  Signal<std::string>& bodyDataReceived() { return bodyDataReceived_; }
 
 protected:
   typedef boost::function<void(const boost::system::error_code&)>
@@ -322,9 +324,17 @@ private:
 	    chunkState_.size = 0;
 	    chunkState_.parsePos = 0;
 	    chunkState_.state = ChunkState::Size;
-	    chunkState_.data = &response_.body_;
 	  }
 	}
+      }
+      
+      if (headersReceived_.isConnected()) {
+	if (server_)
+	  server_->post(sessionId_,
+			boost::bind(&Impl::emitHeadersReceived,
+				    shared_from_this()));
+	else
+	  emitHeadersReceived();
       }
 
       // Write whatever content we already have to output.
@@ -381,90 +391,96 @@ private:
   void addBodyText(const std::string& text)
   {
     if (chunkedResponse_) {
-      chunkedDecode(chunkState_, text);
+      chunkedDecode(text);
       if (chunkState_.state == ChunkState::Error) {
 	protocolError(); return;
       } else if (chunkState_.state == ChunkState::Complete) {
 	complete(); return;
       }
-    } else
-      response_.addBodyText(text);
+    } else {
+      if (maximumResponseSize_)
+	response_.addBodyText(text);
+      haveBodyData(text);
+    }
   }
 
-  static void chunkedDecode(ChunkState& chunkState, const std::string& text)
+  void chunkedDecode(const std::string& text)
   {
     std::string::const_iterator pos = text.begin();
     while (pos != text.end()) {
-      switch (chunkState.state) {
+      switch (chunkState_.state) {
       case ChunkState::Size: {
 	unsigned char ch = *(pos++);
 
-	switch (chunkState.parsePos) {
+	switch (chunkState_.parsePos) {
 	case -2:
 	  if (ch != '\r') {
-	    chunkState.state = ChunkState::Error; return;
+	    chunkState_.state = ChunkState::Error; return;
 	  }
 
-	  chunkState.parsePos = -1;
+	  chunkState_.parsePos = -1;
 
 	  break;
 	case -1:
 	  if (ch != '\n') {
-	    chunkState.state = ChunkState::Error; return;
+	    chunkState_.state = ChunkState::Error; return;
 	  }
 
-	  chunkState.parsePos = 0;
+	  chunkState_.parsePos = 0;
 	  
 	  break;
 	case 0:
 	  if (ch >= '0' && ch <= '9') {
-	    chunkState.size <<= 4;
-	    chunkState.size |= (ch - '0');
+	    chunkState_.size <<= 4;
+	    chunkState_.size |= (ch - '0');
 	  } else if (ch >= 'a' && ch <= 'f') {
-	    chunkState.size <<= 4;
-	    chunkState.size |= (10 + ch - 'a');
+	    chunkState_.size <<= 4;
+	    chunkState_.size |= (10 + ch - 'a');
 	  } else if (ch >= 'A' && ch <= 'F') {
-	    chunkState.size <<= 4;
-	    chunkState.size |= (10 + ch - 'A');
+	    chunkState_.size <<= 4;
+	    chunkState_.size |= (10 + ch - 'A');
 	  } else if (ch == '\r') {
-	    chunkState.parsePos = 2;
+	    chunkState_.parsePos = 2;
 	  } else if (ch == ';') {
-	    chunkState.parsePos = 1;
+	    chunkState_.parsePos = 1;
 	  } else {
-	     chunkState.state = ChunkState::Error; return;
+	     chunkState_.state = ChunkState::Error; return;
 	  }
 
 	  break;
 	case 1:
 	  /* Ignoring extensions and syntax for now */
 	  if (ch == '\r')
-	    chunkState.parsePos = 2;
+	    chunkState_.parsePos = 2;
 
 	  break;
 	case 2:
 	  if (ch != '\n') {
-	    chunkState.state = ChunkState::Error; return;
+	    chunkState_.state = ChunkState::Error; return;
 	  }
 
-	  if (chunkState.size == 0) {
-	    chunkState.state = ChunkState::Complete; return;
+	  if (chunkState_.size == 0) {
+	    chunkState_.state = ChunkState::Complete; return;
 	  }
 	    
-	  chunkState.state = ChunkState::Data;
+	  chunkState_.state = ChunkState::Data;
 	}
 
 	break;
       }
       case ChunkState::Data: {
 	std::size_t thisChunk
-	  = std::min(std::size_t(text.end() - pos), chunkState.size);
-	*chunkState.data << std::string(pos, pos + thisChunk);
-	chunkState.size -= thisChunk;
+	  = std::min(std::size_t(text.end() - pos), chunkState_.size);
+	std::string text = std::string(pos, pos + thisChunk);
+	if (maximumResponseSize_)
+	  response_.addBodyText(text);
+	haveBodyData(text);
+	chunkState_.size -= thisChunk;
 	pos += thisChunk;
 
-	if (chunkState.size == 0) {
-	  chunkState.parsePos = -2;
-	  chunkState.state = ChunkState::Size;
+	if (chunkState_.size == 0) {
+	  chunkState_.parsePos = -2;
+	  chunkState_.state = ChunkState::Size;
 	}
 	break;
       }
@@ -490,9 +506,29 @@ private:
       emitDone();
   }
 
+  void haveBodyData(const std::string& text)
+  {
+    if (bodyDataReceived_.isConnected()) {
+      if (server_)
+	server_->post(sessionId_,
+		      boost::bind(&Impl::emitBodyReceived, shared_from_this(),
+				  text));
+      else
+	emitBodyReceived(text);
+    }
+  }
+
   void emitDone()
   {
     done_.emit(err_, response_);
+  }
+
+  void emitHeadersReceived() {
+    headersReceived_.emit(response_);
+  }
+
+  void emitBodyReceived(const std::string& text) {
+    bodyDataReceived_.emit(text);
   }
 
 protected:
@@ -512,6 +548,8 @@ private:
   boost::system::error_code err_;
   Message response_;
   Signal<boost::system::error_code, Message> done_;
+  Signal<Message> headersReceived_;
+  Signal<std::string> bodyDataReceived_;
 };
 
 class Client::TcpImpl : public Client::Impl
@@ -565,11 +603,12 @@ private:
 class Client::SslImpl : public Client::Impl
 {
 public:
-  SslImpl(WIOService& ioService, WServer *server,
+  SslImpl(WIOService& ioService, bool verifyEnabled, WServer *server,
 	  boost::asio::ssl::context& context, const std::string& sessionId,
 	  const std::string& hostName)
     : Impl(ioService, server, sessionId),
       socket_(ioService_, context),
+      verifyEnabled_(verifyEnabled),
       hostName_(hostName)
   { }
 
@@ -588,11 +627,13 @@ protected:
   virtual void asyncHandshake(const ConnectHandler& handler)
   {
 #ifdef VERIFY_CERTIFICATE
-    socket_.set_verify_mode(boost::asio::ssl::verify_peer);
-    LOG_DEBUG("verifying that peer is " << hostName_);
-    socket_.set_verify_callback
-      (boost::asio::ssl::rfc2818_verification(hostName_));
-#endif
+    if (verifyEnabled_) {
+      socket_.set_verify_mode(boost::asio::ssl::verify_peer);
+      LOG_DEBUG("verifying that peer is " << hostName_);
+      socket_.set_verify_callback
+	(boost::asio::ssl::rfc2818_verification(hostName_));
+    }
+#endif // VERIFY_CERTIFICATE
 
     socket_.async_handshake(boost::asio::ssl::stream_base::client, handler);
   }
@@ -618,6 +659,7 @@ private:
   typedef boost::asio::ssl::stream<tcp::socket> ssl_socket;
 
   ssl_socket socket_;
+  bool verifyEnabled_;
   std::string hostName_;
 };
 #endif // WT_WITH_SSL
@@ -627,6 +669,11 @@ Client::Client(WObject *parent)
     ioService_(0),
     timeout_(10),
     maximumResponseSize_(64*1024),
+#ifdef VERIFY_CERTIFICATE
+    verifyEnabled_(true),
+#else
+    verifyEnabled_(false),
+#endif
     followRedirect_(false),
     redirectCount_(0),
     maxRedirects_(20)
@@ -637,6 +684,11 @@ Client::Client(WIOService& ioService, WObject *parent)
     ioService_(&ioService),
     timeout_(10),
     maximumResponseSize_(64*1024),
+#ifdef VERIFY_CERTIFICATE
+    verifyEnabled_(true),
+#else
+    verifyEnabled_(false),
+#endif
     followRedirect_(false),
     redirectCount_(0),
     maxRedirects_(20)
@@ -645,6 +697,11 @@ Client::Client(WIOService& ioService, WObject *parent)
 Client::~Client()
 {
   abort();
+}
+
+void Client::setSslCertificateVerificationEnabled(bool enabled)
+{
+  verifyEnabled_ = enabled;
 }
 
 void Client::abort()
@@ -669,6 +726,11 @@ void Client::setMaximumResponseSize(std::size_t bytes)
 void Client::setSslVerifyFile(const std::string& file)
 {
   verifyFile_ = file;
+}
+
+void Client::setSslVerifyPath(const std::string& path)
+{
+  verifyPath_ = path;
 }
 
 bool Client::get(const std::string& url)
@@ -739,8 +801,8 @@ bool Client::request(Http::Method method, const std::string& url,
       (*ioService, boost::asio::ssl::context::sslv23);
 
 #ifdef VERIFY_CERTIFICATE
-    context.set_default_verify_paths();
-#endif
+    if (verifyEnabled_)
+      context.set_default_verify_paths();
 
     if (!verifyFile_.empty() || !verifyPath_.empty()) {
       if (!verifyFile_.empty())
@@ -748,8 +810,9 @@ bool Client::request(Http::Method method, const std::string& url,
       if (!verifyPath_.empty())
 	context.add_verify_path(verifyPath_);
     }
+#endif // VERIFY_CERTIFICATE
 
-    impl_.reset(new SslImpl(*ioService, 
+    impl_.reset(new SslImpl(*ioService, verifyEnabled_,
 			    server, 
 			    context, 
 			    sessionId, 
@@ -762,10 +825,18 @@ bool Client::request(Http::Method method, const std::string& url,
   }
 
   if (followRedirect()) {
-    impl_->done().connect(boost::bind(&Client::handleRedirect, this, method, _1, _2));
+    impl_->done().connect(boost::bind(&Client::handleRedirect,
+				      this, method, _1, _2));
   } else {
     impl_->done().connect(this, &Client::emitDone);
   }
+
+  if (headersReceived_.isConnected())
+    impl_->headersReceived().connect(this, &Client::emitHeadersReceived);
+
+  if (bodyDataReceived_.isConnected())
+    impl_->bodyDataReceived().connect(this, &Client::emitBodyReceived);
+
   impl_->setTimeout(timeout_);
   impl_->setMaximumResponseSize(maximumResponseSize_);
 
@@ -827,6 +898,16 @@ void Client::emitDone(boost::system::error_code err, const Message& response)
 {
   redirectCount_ = 0;
   done_.emit(err, response);
+}
+
+void Client::emitHeadersReceived(const Message& response)
+{
+  headersReceived_.emit(response);
+}
+
+void Client::emitBodyReceived(const std::string& data)
+{
+  bodyDataReceived_.emit(data);
 }
 
 bool Client::parseUrl(const std::string &url, URL &parsedUrl)
