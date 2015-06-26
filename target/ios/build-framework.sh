@@ -11,11 +11,11 @@
 : ${ISIM_SDK:=/Developer/Platforms/iPhoneSimulator.platform/Developer}
 : ${SDK_VER:=5.0}
 
-CONCURRENT_JOBS=4
-BUILD_DBO_ONLY=false
+CONCURRENT_JOBS=8
+BUILD_DBO_ONLY=true
 BUILD_DBO_COMMAND=``
-BOOST_FRAMEWORK_PATH=/Users/tho/external-libs/boost/ios/framework
-SDK_VER=8.1
+BOOST_FRAMEWORK_PATH=/Users/jtomson/sandbox/babbage/3rdparty/boost-darwin-cook/ios/framework
+SDK_VER=8.3
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
@@ -41,7 +41,7 @@ echo "Build DBO only? ${BUILD_DBO_ONLY}: ${BUILD_DBO_COMMAND}"
 : ${WT_VERSION:=3_2_0}
 : ${FRAMEWORKDIR:=`pwd`}
 
-BUILD_ARMV6_DIR=$BUILD_DIR/build-armv6
+BUILD_ARM64_DIR=$BUILD_DIR/build-arm64
 BUILD_ARMV7_DIR=$BUILD_DIR/build-armv7
 BUILD_I386_DIR=$BUILD_DIR/build-i386
 BUILD_X8664_DIR=$BUILD_DIR/build-x8664
@@ -75,24 +75,24 @@ abort()
 
 clean()
 {
-    rm -rf $BUILD_ARMV6_DIR
+    rm -rf $BUILD_ARM64_DIR
     rm -rf $BUILD_ARMV7_DIR
     rm -rf $BUILD_I386_DIR
     rm -rf $BUILD_X8664_DIR
     rm -rf $TMP_DIR
 }
 
-build-armv6()
+build-arm64()
 {
     rm -rf $BUILD_X8664_DIR
-   [ -d $BUILD_ARMV6_DIR ] || mkdir -p $BUILD_ARMV6_DIR
-   ( cd $BUILD_ARMV6_DIR; ${CMAKE} \
+   [ -d $BUILD_ARM64_DIR ] || mkdir -p $BUILD_ARM64_DIR
+   ( cd $BUILD_ARM64_DIR; ${CMAKE} \
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv6 -pipe" \
-       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv6 -pipe -DWT_NO_SPIRIT" \
-       ../../ && make ) || abort "Failed building for arm6 architecture"
+       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe" \
+       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe -DWT_NO_SPIRIT" \
+       ../../ && make ) || abort "Failed building for arm64 architecture"
 }
 
 build-armv7()
@@ -201,10 +201,11 @@ createFramework()
 
     echo "Framework: Creating final library..."
     lipo -create \
-	-arch armv7 build-armv7/Wt.a \
-	-arch i386 build-i386/Wt.a \
-	-arch x86_64 build-x8664/Wt.a \
-	-o $FRAMEWORK_INSTALL_NAME || abort "lipo failed"
+    -arch arm64  $BUILD_ARM64_DIR/Wt.a \
+    -arch armv7  $BUILD_ARMV7_DIR/Wt.a \
+    -arch i386   $BUILD_I386_DIR/Wt.a \
+    -arch x86_64 $BUILD_X8664_DIR/Wt.a \
+    -o $FRAMEWORK_INSTALL_NAME || abort "lipo failed"
 
     echo "Framework: Copying headers..."
     cp -r stage/include/Wt/* $FRAMEWORK_BUNDLE/Headers/
@@ -235,11 +236,11 @@ EOF
 }
 
 clean
-#build-armv6
 build-armv7
+build-arm64
 build-i386
 build-x8664
-#combineLibs $BUILD_ARMV6_DIR
+combineLibs $BUILD_ARM64_DIR
 combineLibs $BUILD_ARMV7_DIR
 combineLibs $BUILD_I386_DIR
 combineLibs $BUILD_X8664_DIR
