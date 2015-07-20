@@ -12,10 +12,10 @@
 : ${SDK_VER:=5.0}
 
 CONCURRENT_JOBS=8
-BUILD_DBO_ONLY=true
+BUILD_DBO_ONLY=false
 BUILD_DBO_COMMAND=``
 BOOST_FRAMEWORK_PATH=/Users/jtomson/sandbox/babbage/3rdparty/boost-darwin-cook/ios/framework
-SDK_VER=8.3
+SDK_VER=8.4
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
