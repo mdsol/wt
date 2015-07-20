@@ -60,6 +60,13 @@ class QueryColumn;
  *  - rowCount()
  *  - a batch of data, controlled by setBatchSize()
  *
+ * Moreover, the model will try to fetch a batch of data even if you
+ * ask for the rowCount(), which may provide the row count as a
+ * side-effect if the query returns less results than a single batch
+ * size. If you do not want this behaviour (which might be the case if
+ * you are only interested in rowCount(), not the actual data) then
+ * you can avoid this behaviour by setting batchSize to 0.
+ *
  * \ingroup dbo modelview
  */
 template <class Result>
@@ -279,8 +286,24 @@ public:
    *
    * This sorts the model by changing the query using
    * Query<BindStrategy>::orderBy().
+   *
+   * \sa createOrderBy()
    */
   virtual void sort(int column, SortOrder order = AscendingOrder);
+
+  /*! \brief Create specialized orderBy clause for sort
+   *
+   * The sort() method calls createOrderBy() to format a SQL
+   * clause for use in Query<BindStrategy>::orderBy().
+   * The default is to return a string that will sort on
+   * a single column in the specified order.
+   *
+   * Customize this method if you need a more complex orderBy
+   * clause, e.g. to break ties consistently.
+   *
+   * \sa sort()
+   */
+  virtual std::string createOrderBy(int column, SortOrder order);
 
   /*! \brief Inserts one or more rows.
    *
@@ -368,6 +391,8 @@ protected:
   virtual Result resultById(long long id) const;
 
 private:
+  void cacheRow(int row) const;
+
   typedef std::vector<boost::any> AnyList;
   typedef std::map<int, long long> StableResultIdMap;
 
@@ -375,6 +400,7 @@ private:
 
   mutable Query<Result> query_;
   int queryLimit_, queryOffset_, batchSize_;
+  mutable std::string sortOrderBy_;
 
   mutable int cachedRowCount_;
   mutable int cacheStart_;

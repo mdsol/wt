@@ -32,11 +32,15 @@ void QueryModel<Result>::setQuery(const Query<Result>& query,
     query_ = query;
     fields_ = query_.fields();
     columns_.clear();
+    sortOrderBy_.clear();
     reset();
   } else {
     invalidateData();
     query_ = query;
     fields_ = query_.fields();
+    if (!sortOrderBy_.empty()) {
+      query_.orderBy(sortOrderBy_);
+    }
     dataReloaded();
   }
 }
@@ -103,13 +107,18 @@ int QueryModel<Result>::rowCount(const WModelIndex& parent) const
     return 0;
 
   if (cachedRowCount_ == -1) {
-    Transaction transaction(query_.session());
+    if (batchSize_)
+      cacheRow(0);
 
-    query_.limit(queryLimit_);
-    query_.offset(queryOffset_);
-    cachedRowCount_ = static_cast<int>(query_.resultList().size());
+    if (cachedRowCount_ == -1) {
+      Transaction transaction(query_.session());
 
-    transaction.commit();
+      query_.limit(queryLimit_);
+      query_.offset(queryOffset_);
+      cachedRowCount_ = static_cast<int>(query_.resultList().size());
+
+      transaction.commit();
+    }
   }
 
   return cachedRowCount_;
@@ -201,11 +210,18 @@ void QueryModel<Result>::sort(int column, SortOrder order)
 
   invalidateData();
 
-  query_.orderBy(fields_[columns_[column].fieldIdx_].sql() + " "
-		 + (order == AscendingOrder ? "asc" : "desc"));
+  sortOrderBy_ = createOrderBy(column, order);
+  query_.orderBy(sortOrderBy_);
 
   cachedRowCount_ = rc;
   dataReloaded();
+}
+
+template <class Result>
+std::string QueryModel<Result>::createOrderBy(int column, SortOrder order)
+{
+  return fieldInfo(column).sql() + " "
+		 + (order == AscendingOrder ? "asc" : "desc");
 }
 
 template <class Result>
@@ -221,6 +237,17 @@ Result QueryModel<Result>::stableResultRow(int row) const
 
 template <class Result>
 Result& QueryModel<Result>::resultRow(int row)
+{
+  cacheRow(row);
+
+  if (row >= cacheStart_ + static_cast<int>(cache_.size()))
+    throw Exception("QueryModel: geometry inconsistent with database");
+
+  return cache_[row - cacheStart_];
+}
+
+template <class Result>
+void QueryModel<Result>::cacheRow(int row) const
 {
   if (row < cacheStart_
       || row >= cacheStart_ + static_cast<int>(cache_.size())) {
@@ -247,14 +274,12 @@ Result& QueryModel<Result>::resultRow(int row)
       if (id != -1)
 	stableIds_[cacheStart_ + i] = id;
     }
-
-    if (row >= cacheStart_ + static_cast<int>(cache_.size()))
-      throw Exception("QueryModel: geometry inconsistent with database");
+    if (static_cast<int>(cache_.size()) < qLimit
+        && qOffset == 0 && cachedRowCount_ == -1)
+      cachedRowCount_ = cache_.size();
 
     transaction.commit();
   }
-
-  return cache_[row - cacheStart_];
 }
 
 template <class Result>
@@ -401,6 +426,8 @@ bool QueryModel<Result>::setHeaderData(int section, Orientation orientation,
       role = DisplayRole;
 
     columns_[section].headerData_[role] = value;
+
+    headerDataChanged().emit(orientation, section, section);
 
     return true;
   } else
