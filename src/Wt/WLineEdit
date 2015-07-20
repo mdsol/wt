@@ -192,6 +192,12 @@ public:
    */
   bool hasSelectedText() const;
 
+  /*! \brief Selects length characters starting from the start position
+   *
+   * \sa selectedtext()
+   */
+  void setSelection(int start, int length);
+
   /*! \brief Returns the current cursor position.
    *
    * Returns -1 if the widget does not have the focus.
@@ -292,7 +298,21 @@ public:
 
   virtual WValidator::State validate();
 
+  /*! \brief Event signal emitted when the text in the input field changed.
+   *
+   * This signal is emitted whenever the text contents has
+   * changed. Unlike the changed() signal, the signal is fired on
+   * every change, not only when the focus is lost. Unlike the
+   * keyPressed() signal, this signal is fired also for other events
+   * that change the text, such as paste actions.
+   *
+   * \sa keyPressed(), changed()
+   */
+  EventSignal<>& textInput();
+
 private:
+  static const char *INPUT_SIGNAL;
+
   WT_USTRING content_;
   WT_USTRING displayContent_;
   int        textSize_;

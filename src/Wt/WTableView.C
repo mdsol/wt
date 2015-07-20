@@ -64,8 +64,6 @@ WTableView::WTableView(WContainerWidget *parent)
 {
   setSelectable(false);
 
-  dropEvent_.connect(this, &WTableView::onDropEvent);
-
   setStyleClass("Wt-itemview Wt-tableview");
 
   WApplication *app = WApplication::instance();
@@ -96,6 +94,12 @@ WTableView::WTableView(WContainerWidget *parent)
     canvas_->setPositionScheme(Relative);
     canvas_->clicked()
       .connect(boost::bind(&WTableView::handleSingleClick, this, false, _1));
+
+	canvas_->clicked().connect(
+		"function(o, e) { "
+		  "$(document).trigger('click', e);"
+		"}");
+
     canvas_->clicked().preventPropagation();
     canvas_->mouseWentDown()
       .connect(boost::bind(&WTableView::handleMouseWentDown, this, false, _1)); 
@@ -114,8 +118,6 @@ WTableView::WTableView(WContainerWidget *parent)
       .connect(boost::bind(&WTableView::handleRootSingleClick, this, 0, _1));
     contentsContainer_->mouseWentUp()
       .connect(boost::bind(&WTableView::handleRootMouseWentUp, this, 0, _1));
-
-    scrolled_.connect(this, &WTableView::onViewportChange);
 
     headerColumnsHeaderContainer_ = new WContainerWidget();
     headerColumnsHeaderContainer_->setStyleClass("Wt-header Wt-headerdiv "
@@ -657,7 +659,7 @@ void WTableView::setHidden(bool hidden, const WAnimation& animation)
      * 'none' to ''
      */
     WApplication *app = WApplication::instance();
-    if (app->environment().ajax()
+    if (app->environment().ajax() && isRendered()
 	&& app->environment().agentIsIE()
 	&& !app->environment().agentIsIElt(9)) {
       WStringStream s;
@@ -731,6 +733,12 @@ void WTableView::defineJavaScript()
 		      + headerColumnsContainer_->jsRef() + ",'"
 		      + WApplication::instance()->theme()->activeClass()
 		      + "');");
+
+  if (!dropEvent_.isConnected())
+    dropEvent_.connect(this, &WTableView::onDropEvent);
+
+  if (!scrolled_.isConnected())
+    scrolled_.connect(this, &WTableView::onViewportChange);
 
   if (viewportTop_ != 0) {
     WStringStream s;
@@ -1003,6 +1011,7 @@ void WTableView::setColumnWidth(int column, const WLength& width)
   else
     hc = headers_->widget(column - rowHeaderCount());
 
+  hc->setWidth(0);
   hc->setWidth(rWidth.toPixels() + 1);
   if (!ajaxMode())
     hc->parent()->resize(rWidth.toPixels() + 1, hc->height());
@@ -1067,7 +1076,9 @@ void WTableView::updateColumnOffsets()
     ColumnInfo ci = columnInfo(i);
 
     ColumnWidget *w = columnContainer(i);
+    w->setOffsets(0, Left);
     w->setOffsets(totalRendered, Left);
+    w->setWidth(0);
     w->setWidth(ci.width.toPixels() + 7);
 
     if (!columnInfo(i).hidden)
@@ -1095,7 +1106,9 @@ void WTableView::updateColumnOffsets()
     if (i >= fc && i <= lc) {
       ColumnWidget *w = columnContainer(rowHeaderCount() + i - fc);
 
+      w->setOffsets(0, Left);
       w->setOffsets(totalRendered, Left);
+      w->setWidth(0);
       w->setWidth(ci.width.toPixels() + 7);
 
       if (!columnInfo(i).hidden)
@@ -1882,9 +1895,9 @@ void WTableView::scrollTo(int x, int y) {
   }
 }
 
-void WTableView::setOverflow(WContainerWidget::Overflow overflow){
+void WTableView::setOverflow(WContainerWidget::Overflow overflow, WFlags< Orientation > orientation){
   if (contentsContainer_)
-    contentsContainer_->setOverflow(overflow);
+    contentsContainer_->setOverflow(overflow, orientation);
 }
 
 void WTableView::setRowHeaderCount(int count)

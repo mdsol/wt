@@ -5,6 +5,7 @@
  */
 
 #include "Wt/WBrush"
+#include "Wt/WStringStream"
 
 namespace Wt {
 
@@ -38,6 +39,8 @@ WBrush WBrush::clone() const
 {
   WBrush result;
 
+  if (isJavaScriptBound()) result.assignBinding(*this);
+
   result.color_ = color_;
   result.gradient_ = gradient_;
   result.style_ = style_;
@@ -48,6 +51,7 @@ WBrush WBrush::clone() const
 
 void WBrush::setColor(const WColor& color)
 {
+  checkModifiable();
   color_ = color;
   if (style_ == GradientPattern)
     style_ = SolidPattern;
@@ -55,6 +59,7 @@ void WBrush::setColor(const WColor& color)
 
 void WBrush::setGradient(const WGradient& gradient)
 {
+  checkModifiable();
   if (!gradient_.isEmpty()) {
     gradient_ = gradient;
     style_ = GradientPattern;
@@ -63,13 +68,26 @@ void WBrush::setGradient(const WGradient& gradient)
 
 void WBrush::setStyle(BrushStyle style)
 {
+  checkModifiable();
   style_ = style;
+}
+
+WBrush &WBrush::operator=(const WBrush &rhs)
+{
+  WJavaScriptExposableObject::operator=(rhs);
+
+  color_ = rhs.color_;
+  gradient_ = rhs.gradient_;
+  style_ = rhs.style_;
+
+  return *this;
 }
 
 bool WBrush::operator==(const WBrush& other) const
 {
   return
-       color_ == other.color_
+       sameBindingAs(other)
+    && color_ == other.color_
     && style_ == other.style_
     && gradient_ == other.gradient_;
 }
@@ -77,6 +95,17 @@ bool WBrush::operator==(const WBrush& other) const
 bool WBrush::operator!=(const WBrush& other) const
 {
   return !(*this == other);
+}
+
+std::string WBrush::jsValue() const
+{
+  WStringStream ss;
+  ss << "{\"color\":["
+    << color_.red() << ","
+    << color_.green() << ","
+    << color_.blue() << ","
+    << color_.alpha() << "]}";
+  return ss.str();
 }
 
 }

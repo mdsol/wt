@@ -6,6 +6,8 @@
 
 #include "Wt/WPen"
 
+#include "Wt/WStringStream"
+
 namespace Wt {
 
 WPen::WPen()
@@ -53,50 +55,72 @@ WPen::WPen(const WGradient& gradient)
 WPen WPen::clone() const
 {
   WPen result;
+  if (isJavaScriptBound()) result.assignBinding(*this);
   result.penStyle_ = penStyle_;
   result.penCapStyle_ = penCapStyle_;
   result.penJoinStyle_ = penJoinStyle_;
   result.width_ = width_;
-  result.color_ = color_;
+  result.color_ = WColor(color_.red(), color_.green(), color_.blue(), color_.alpha());
   return result;
 }
 #endif // WT_TARGET_JAVA
 
 void WPen::setStyle(PenStyle style)
 {
+  checkModifiable();
   penStyle_ = style;
 }
 
 void WPen::setCapStyle(PenCapStyle style)
 {
+  checkModifiable();
   penCapStyle_ = style;
 }
 
 void WPen::setJoinStyle(PenJoinStyle style)
 {
+  checkModifiable();
   penJoinStyle_ = style;
 }
 
 void WPen::setWidth(const WLength& width)
 {
+  checkModifiable();
   width_ = width;
 }
 
 void WPen::setColor(const WColor& color)
 {
+  checkModifiable();
   color_ = color;
   gradient_ = WGradient();
 }
 
 void WPen::setGradient(const WGradient& gradient)
 {
+  checkModifiable();
   gradient_ = gradient;
+}
+
+WPen& WPen::operator=(const WPen& rhs)
+{
+  WJavaScriptExposableObject::operator=(rhs);
+
+  penStyle_ = rhs.penStyle_;
+  penCapStyle_ = rhs.penCapStyle_;
+  penJoinStyle_ = rhs.penJoinStyle_;
+  width_ = rhs.width_;
+  color_ = rhs.color_;
+  gradient_ = rhs.gradient_;
+
+  return *this;
 }
 
 bool WPen::operator==(const WPen& other) const
 {
   return
-       penStyle_ == other.penStyle_
+       sameBindingAs(other)
+    && penStyle_ == other.penStyle_
     && penCapStyle_ == other.penCapStyle_
     && penJoinStyle_ == other.penJoinStyle_
     && width_ == other.width_
@@ -107,6 +131,18 @@ bool WPen::operator==(const WPen& other) const
 bool WPen::operator!=(const WPen& other) const
 {
   return !(*this == other);
+}
+
+
+std::string WPen::jsValue() const
+{
+  WStringStream ss;
+  ss << "{\"color\":["
+    << color_.red() << ","
+    << color_.green() << ","
+    << color_.blue() << ","
+    << color_.alpha() << "]}";
+  return ss.str();
 }
 
 }

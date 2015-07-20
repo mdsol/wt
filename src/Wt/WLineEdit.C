@@ -28,6 +28,8 @@ namespace Wt {
 
 LOGGER("WLineEdit");
 
+const char *WLineEdit::INPUT_SIGNAL = "input";
+
 WLineEdit::WLineEdit(WContainerWidget *parent)
   : WFormWidget(parent),
     textSize_(10),
@@ -289,6 +291,13 @@ bool WLineEdit::hasSelectedText() const
 {
   return selectionStart() != -1;
 }
+  
+void WLineEdit::setSelection(int start, int length)
+{
+  std::string s = boost::lexical_cast<std::string>(start);
+  std::string e = boost::lexical_cast<std::string>(start + length);
+  doJavaScript(WT_CLASS".setSelectionRange(" + jsRef() + "," + s + "," + e + ")" );
+}
 
 int WLineEdit::cursorPosition() const
 {
@@ -518,6 +527,11 @@ bool WLineEdit::acceptChar(char chr, std::size_t position) const {
       return (chr == '0' || chr == '1');
   }
   return false;
+}
+
+EventSignal<>& WLineEdit::textInput()
+{
+  return *voidEventSignal(INPUT_SIGNAL, true);
 }
 
 void WLineEdit::defineJavaScript()

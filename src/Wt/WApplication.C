@@ -90,6 +90,7 @@ WApplication::WApplication(const WEnvironment& env
 #endif // WT_CNOR
     titleChanged_(false),
     closeMessageChanged_(false),
+    localeChanged_(false),
     localizedStrings_(0),
     internalPathChanged_(this),
     serverPush_(0),
@@ -459,6 +460,12 @@ std::string WApplication::appRoot()
 std::string WApplication::docRoot() const
 {
   return environment().getCgiValue("DOCUMENT_ROOT");
+}
+
+void WApplication::setConnectionMonitor(const std::string& jsFunction) {
+  doJavaScript(javaScriptClass_
+	       + "._p_.setConnectionMonitor("+ jsFunction + ")");
+
 }
 
 #endif // WT_TARGET_JAVA
@@ -869,6 +876,7 @@ WObject *WApplication::decodeObject(const std::string& objectId) const
 void WApplication::setLocale(const WLocale& locale)
 {
   locale_ = locale;
+  localeChanged_ = true;
   refresh();
 }
 
@@ -1390,7 +1398,7 @@ WApplication::UpdateLock::UpdateLock(WApplication *app)
   if (handler && handler->haveLock() && handler->session() == appSession.get())
     return;
 
-  if (appSession.get())
+  if (appSession.get() && !appSession->dead())
     impl_ = new UpdateLockImpl(app);
   else
     ok_ = false;

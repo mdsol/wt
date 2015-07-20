@@ -1,40 +1,65 @@
+#include <cstring>
 #include "Specificity.h"
 
 using namespace Wt::Render;
 
 Specificity::Specificity(bool valid)
-  : value_("     ")
-{setA(0); setB(0); setC(0); setD(0);setValid(valid);}
+  : value_(0),
+    valid_(valid)
+{ }
 
 Specificity::Specificity(int a, int b, int c, int d)
-  : value_("     ")
-{setA(a); setB(b); setC(c); setD(d);setValid(true);}
+  : value_(0),
+    valid_(true)
+{
+  setA(a);
+  setB(b); 
+  setC(c);
+  setD(d);
+}
 
-void Specificity::setValid(bool b){value_[0] = b ? (char)1 : (char)0;}
-void Specificity::setA    (int  a){value_[1] = (char)(a % 256);}
-void Specificity::setB    (int  b){value_[2] = (char)(b % 256);}
-void Specificity::setC    (int  c){value_[3] = (char)(c % 256);}
-void Specificity::setD    (int  d){value_[4] = (char)(d % 256);}
+bool Specificity::operator==(const Specificity& other) const
+{
+  return valid_ == other.valid_ && value_ == other.value_;
+}
 
-bool Specificity::isValid() const { return value_[0] == (char)1; }
+void Specificity::setA(int a)
+{
+  value_ = (value_ & ~0xFF000000) | ((a & 0xFF) << 24);
+}
+
+void Specificity::setB(int b)
+{
+  value_ = (value_ & ~0x00FF0000) | ((b & 0xFF) << 16);
+}
+
+void Specificity::setC(int c)
+{
+  value_ = (value_ & ~0x0000FF00) | ((c & 0xFF) << 8);
+}
+
+void Specificity::setD(int d)
+{
+  value_ = (value_ & ~0x000000FF) | (d & 0xFF);
+}
 
 bool Specificity::isSmallerThen(const Specificity& other) const
 {
-  return value_ < other.value_;
+  return !valid_ ? true : value_ < other.value_;
 }
 
 bool Specificity::isGreaterThen(const Specificity& other) const
 {
-  return value_ > other.value_;
+  return !other.valid_ ? true : value_ > other.value_;
 }
 
 bool Specificity::isSmallerOrEqualThen(const Specificity& other) const
 {
-  return !(isGreaterThen(other));
+  return !isGreaterThen(other);
 }
 
 bool Specificity::isGreaterOrEqualThen(const Specificity& other) const
 {
-  return !(isSmallerThen(other));
+  return !isSmallerThen(other);
 }
 

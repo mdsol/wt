@@ -20,7 +20,9 @@ WT_DECLARE_WT_MEMBER
    function doHide() {
      setOthersInactive(el, null);
      el.style.display = 'none';
-     APP.emit(el.id, 'cancel');
+	 setTimeout(function() {
+       APP.emit(el.id, 'cancel');
+	 }, 0);
    }
 
    function setActive(item, active) {
@@ -144,17 +146,22 @@ WT_DECLARE_WT_MEMBER
      $(popup).mouseleave(mouseLeave).mouseenter(mouseEnter);
    }
 
+   function stillExist() {
+	 return document.getElementById(el.id) != null;
+   }
+
    function onDocumentDown(event) {
-     if (WT.button(event) != 1)
+     if (stillExist() && WT.button(event) != 1)
        doHide();
    }
 
    function onDocumentClick(event) {
-     doHide();
+	 if(stillExist())
+	   doHide();
    }
 
    function onDocumentKeyDown(event) {
-     if (event.keyCode == 27)
+     if (stillExist() && event.keyCode == 27)
        doHide();
    }
 
@@ -168,6 +175,7 @@ WT_DECLARE_WT_MEMBER
      current = null;
 
      if (hidden) {
+	  
        el.style.position = '';
        el.style.display = '';
        el.style.left = '';

@@ -99,7 +99,6 @@ public:
 
   void externalNotify(const WEvent::Impl& e);
   void notify(const WEvent& e);
-  void pushUpdates();
 
   void doRecursiveEventLoop();
 
@@ -197,6 +196,7 @@ public:
     static Handler *instance();
 
     bool haveLock() const;
+    void unlock();
 
     void flushResponse();
     WebResponse *response() { return response_; }
@@ -218,6 +218,9 @@ public:
   private:
     void init();
 
+#ifndef WT_TARGET_JAVA
+    boost::shared_ptr<WebSession> sessionPtr_;
+#endif
 #ifdef WT_THREADED
     boost::mutex::scoped_lock lock_;
     boost::thread::id lockOwner_;
@@ -228,9 +231,6 @@ public:
     Handler *prevHandler_;
 
     WebSession *session_;
-#ifndef WT_TARGET_JAVA
-    boost::shared_ptr<WebSession> sessionPtr_;
-#endif
 
     WebRequest *request_;
     WebResponse *response_;
@@ -258,6 +258,8 @@ private:
   void handleWebSocketRequest(Handler& handler);
   static void handleWebSocketMessage(boost::weak_ptr<WebSession> session,
 				     WebReadEvent event);
+  static void webSocketConnect(boost::weak_ptr<WebSession> session,
+			       WebWriteEvent event);
   static void webSocketReady(boost::weak_ptr<WebSession> session,
 			     WebWriteEvent event);
 
@@ -287,13 +289,14 @@ private:
   std::string applicationName_;
   std::string bookmarkUrl_, basePath_, absoluteBaseUrl_;
   std::string applicationUrl_, deploymentPath_;
+  std::string docRoot_;
   std::string redirect_;
   std::string pagePathInfo_;
   std::string pongMessage_;
-  WebResponse *asyncResponse_, *bootStyleResponse_;
-  bool canWriteAsyncResponse_;
+  WebResponse *asyncResponse_, *webSocket_, *bootStyleResponse_;
+  bool canWriteWebSocket_, webSocketConnected_;
   int pollRequestsIgnored_;
-  bool progressiveBoot_, bootStyle_;
+  bool progressiveBoot_;
 
   WebRequest *deferredRequest_;
   WebResponse *deferredResponse_;
@@ -324,6 +327,7 @@ private:
 
   Handler *recursiveEventHandler_;
 
+  void pushUpdates();
   WResource *decodeResource(const std::string& resourceId);
   EventSignalBase *decodeSignal(const std::string& signalId,
 				bool checkExposed) const;
@@ -366,28 +370,39 @@ private:
 
 struct WEvent::Impl {
   WebSession::Handler *handler;
+  WebResponse *response;
   Function function;
   bool renderOnly;
 
   Impl(WebSession::Handler *aHandler, bool doRenderOnly = false)
     : handler(aHandler),
+      response(0),
       renderOnly(doRenderOnly)
   { }
 
   Impl(WebSession::Handler *aHandler, const Function& aFunction)
     : handler(aHandler),
+      response(0),
       function(aFunction),
       renderOnly(false)
   { }
 
   Impl(const Impl& other)
     : handler(other.handler),
+      response(other.response),
       function(other.function),
       renderOnly(other.renderOnly)
   { }
 
+  Impl(WebResponse *aResponse)
+    : handler(0),
+      response(aResponse),
+      renderOnly(true)
+  { }
+
   Impl()
-    : handler(0)
+    : handler(0),
+      response(0)
   { }
 };
 

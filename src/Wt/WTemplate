@@ -329,6 +329,32 @@ public:
 #endif // WT_TARGET_JAVA
   };
 
+  /*! \brief Enumeration that indicates how a widget's ID may be set.
+   *
+   * \sa setWidgetIdMode()
+   */
+  enum WidgetIdMode {
+    /*!
+     * Do not set the widget ID.
+     */
+    SetNoWidgetId,
+
+    /*!
+     * Use setObjectName() to prefix the ID with the varName. This is
+     * a safe choice since Wt still guarantees that the IDs are
+     * unique.
+     */
+    SetWidgetObjectName,
+
+    /*!
+     * Use setId() to set the ID as the varName.
+     *
+     * \warning You must be careful that there are no two widgets with
+     *          the same ID in yor application.
+     */
+    SetWidgetId
+  };
+
   /*! \brief Creates a template widget.
    */
   WTemplate(WContainerWidget *parent = 0);
@@ -363,6 +389,23 @@ public:
    * \sa clear()
    */
   void setTemplateText(const WString& text, TextFormat textFormat = XHTMLText);
+
+  /*! \brief Sets how the varName should be reflected on bound widgets.
+   *
+   * To easily identify a widget in the browser, it may be convenient
+   * to reflect the varName to the widget's ID. This options allows
+   * you to choose from two methods.
+   *
+   * The default value is SetNoWidgetId which does not reflect the
+   * varName on the bound widget.
+   */
+  void setWidgetIdMode(WidgetIdMode mode);
+
+  /*! \brief Returns how the varName is reflected on a bound widget.
+   *
+   * \sa setWidgetIdMode()
+   */
+  WidgetIdMode widgetIdMode() const { return widgetIdMode_; }
 
   /*! \brief Binds a string value to a variable.
    *
@@ -471,6 +514,10 @@ public:
    */
   virtual bool conditionValue(const std::string& name) const;
 
+  /*! \brief Returns the set of conditions set to true.
+   */
+  std::set<std::string> conditionsSet() { return conditions_; }
+
   /*! \brief Resolves the string value for a variable name.
    *
    * This is the main method used to resolve variables in the template
@@ -558,6 +605,9 @@ public:
    */
   virtual WWidget *resolveWidget(const std::string& varName);
 
+  std::vector<WWidget *> widgets() const;
+  std::string varName(WWidget *w) const;
+
   /*! \brief Resolves a function call.
    *
    * This resolves a function with name \p name, and one or more arguments
@@ -611,6 +661,23 @@ public:
    * \sa setInternalPathEncoding()
    */
   bool hasInternalPathEncoding() const { return encodeInternalPaths_; }
+
+  /*! \brief Configures when internal path encoding is done.
+   *
+   * By default, the internal path encoding (if enabled) is done on
+   * the template text before placeholders are being resolved. In some
+   * rare situations, you may want to postpone the internal path
+   * encoding until after placeholders have been resolved, e.g. if a
+   * placeholder was used to provide the string for an anchor href.
+   *
+   * The default value is \c true
+   */
+  void setEncodeTemplateText(bool on);
+
+  /*! \brief Returns whether internal path encoding is done on the template text.
+   * \sa setEncodeTemplateText()
+   */
+  bool encodeTemplateText() const { return encodeTemplateText_; }
 
   virtual void refresh();
 
@@ -692,8 +759,10 @@ private:
   WString text_;
   std::string errorText_;
 
-  bool encodeInternalPaths_, changed_;
+  bool encodeInternalPaths_, encodeTemplateText_, changed_;
+  WidgetIdMode widgetIdMode_;
 
+  std::string encode(const std::string& text) const;
   static std::size_t parseArgs(const std::string& text,
 			       std::size_t pos,
 			       std::vector<WString>& result);

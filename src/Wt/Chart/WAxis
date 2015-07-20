@@ -8,10 +8,12 @@
 #define CHART_WAXIS_H_
 
 #include <Wt/Chart/WChartGlobal>
+#include <Wt/WDateTime>
 #include <Wt/WFont>
 #include <Wt/WPen>
 #include <Wt/WString>
-#include <Wt/WDateTime>
+#include <Wt/WTransform>
+
 #include <boost/any.hpp>
 #include <cfloat>
 
@@ -49,7 +51,17 @@ enum Axis {
 enum AxisValue {
   MinimumValue = 0x1,  //!< At the minimum value.
   MaximumValue = 0x2,  //!< At the maximum value.
-  ZeroValue = 0x4      //!< At the zero value (if displayed).
+  ZeroValue = 0x4,     //!< At the zero value (if displayed).
+  BothSides = 0x8      //!< At both sides (MinimumValue and MaximumValue).
+};
+
+/*! \brief Enumeration that indicates which way the axis ticks point.
+ *
+ * \sa WAxis::setTickDirection(TickDirection)
+ */
+enum TickDirection {
+  Outwards, //!< Towards of the outside of the chart.
+  Inwards   //!< Pointing inwards to the chart.
 };
 
 // for < 3.0.1 compatibility
@@ -449,6 +461,22 @@ public:
    */
   double labelAngle() const { return labelAngle_; }
 
+  /*! \brief Sets the title orientation
+   *
+   * Sets the orientation used for displaying the title.
+   *
+   * The default value is Horizontal
+   *
+   * \sa titleOrientation()
+   */
+  void setTitleOrientation(const Orientation& orientation);
+
+  /*! \brief Returns the title orientation.
+   *
+   * \sa setTitleOrientation()
+   */
+  const Orientation& titleOrientation() const { return titleOrientation_; }
+
   /*! \brief Sets whether gridlines are displayed for this axis.
    *
    * When <i>enabled</i>, gird lines are drawn for each tick on this axis,
@@ -480,6 +508,22 @@ public:
    * \sa setPen()
    */
   const WPen& pen() const { return pen_; }
+
+  /*! \brief Changes the pen used for rendering labels for this axis
+   *
+   * The default value is a black pen of 0 width.
+   *
+   * \sa setGridLinesPen().
+   * \sa setPen().
+   * \sa WCartesianChart::setTextPen()
+   */
+  void setTextPen(const WPen& pen);
+
+  /*! \brief Returns the pen used for rendering labels for this axis
+   *
+   * \sa setTextPen()
+   */
+  const WPen& textPen() const { return textPen_; }
 
   /*! \brief Changes the pen used for rendering the grid lines.
    *
@@ -570,11 +614,88 @@ public:
    */
   virtual WString label(double u) const;
 
-  /*! \brief Returns the chart to which this axis belongs.
+  /*! \brief Sets the initial zoom level for this axis.
    *
-   * \sa WCartesianChart::axis()
+   * Only applies to a WCartesianChart in interactive mode.
+   * The zoom level should be >= 1 and smaller than maxZoom()
+   *
+   * \note This is only implemented for the X and first Y axis. It has no effect on the second Y axis.
    */
-  //  WCartesianChart *chart() const { return chart_; }
+  void setInitialZoom(double initialZoom);
+
+  /*! \brief Get the initial zoom level for this axis.
+   *
+   * \see setInitialZoom()
+   */
+  double initialZoom() const;
+  
+  /*! \brief Sets the maximum zoom level for this axis.
+   *
+   * Only applies to a WCartesianChart in interactive mode.
+   * The zoom level should be >= 1 (no zoom).
+   *
+   * \note This is only implemented for the X and first Y axis. It has no effect on the second Y axis.
+   */
+  void setMaxZoom(double maxZoom);
+
+  /*! \brief Get the maximum zoom level for this axis.
+   *
+   * \see setMaxZoom()
+   */
+  double maxZoom() const;
+
+  /*! \brief Sets the initial value to pan to for this axis.
+   *
+   * This sets the leftmost (horizontal axis)
+   * or bottom (vertical axis) value to be displayed on the chart.
+   *
+   * Note that if this would cause the chart to go out of bounds,
+   * the panning of the chart will be automatically adjusted.
+   *
+   * Only applies to a WCartesianChart in interactive mode.
+   * The zoom level should be >= 1 and smaller than maxZoom()
+   *
+   * \note This is only implemented for the X and first Y axis. It has no effect on the second Y axis.
+   */
+  void setInitialPan(double initialPan);
+
+  /*! \brief Get the initial value to pan to for this axis, when pan is enabled on the chart.
+   *
+   *  \see setInitialPan()
+   */
+  double initialPan() const;
+
+  /*! \brief Sets the padding between the chart area and this axis.
+   *
+   * \sa padding()
+   */
+  void setPadding(int padding);
+
+  /*! \brief Returns the padding between the chart area and this axis.
+   * 
+   * \sa setPadding()
+   */
+  int padding() const { return padding_; }
+
+  /*! \brief Sets the direction that the axis ticks should point to.
+   *
+   * If set to Outwards, the axis ticks will point outside of
+   * the chart, and the labels will be on the outside.
+   *
+   * If set to Inwards, the axis ticks will point inside of
+   * the chart, and the labels will be on the inside. Also,
+   * the padding() will be set to 25.
+   *
+   * \sa tickDirection()
+   * \sa setPadding()
+   */
+  void setTickDirection(TickDirection direction);
+
+  /*! \brief Gets the direction that the axis ticks point to.
+   *
+   * \sa setTickDirection()
+   */
+  TickDirection tickDirection() const { return tickDirection_; }
 
   int segmentCount() const { return (int)segments_.size(); }
 
@@ -587,7 +708,22 @@ public:
 	      const WPointF& axisStart,
 	      const WPointF& axisEnd,
 	      double tickStart, double tickEnd, double labelPos,
-	      WFlags<AlignmentFlag> labelFlags) const;
+	      WFlags<AlignmentFlag> labelFlags,
+	      const WTransform &transform = WTransform()) const {
+    std::vector<WPen> pens;
+    std::vector<WPen> textPens;
+    render(painter, properties, axisStart, axisEnd, tickStart, tickEnd, labelPos, labelFlags, transform, pens, textPens);
+  }
+
+  void render(WPainter& painter,
+	      WFlags<AxisProperty> properties,
+	      const WPointF& axisStart,
+	      const WPointF& axisEnd,
+	      double tickStart, double tickEnd, double labelPos,
+	      WFlags<AlignmentFlag> labelFlags,
+	      const WTransform &transform,
+	      std::vector<WPen> pens,
+	      std::vector<WPen> textPens) const;
 
   /*! \brief Returns the positions for grid lines on this axis.
    *
@@ -598,13 +734,19 @@ public:
 
   void renderLabel(WPainter& painter,
 		   const WString& text, const WPointF& p,
-		   const WColor& color,
 		   WFlags<AlignmentFlag> flags,
-		   double angle, int margin) const;
+		   double angle, int margin, WTransform transform,
+		   const WPen& pen) const;
 
   void setRenderMirror(bool enable) { renderingMirror_ = enable; }
+  double calcTitleSize(WPaintDevice *device, Orientation orientation) const;
+  double calcMaxTickLabelSize(WPaintDevice *device, Orientation orientation) const;
 
 protected:
+  /*! \brief Represents a Date time unit
+   */
+  enum DateTimeUnit { Seconds, Minutes, Hours, Days, Months, Years };
+  
   /*! \brief Represents a label/tick on the axis.
    */
   struct TickLabel {
@@ -628,10 +770,13 @@ protected:
 
   /*! \brief Returns the label (and ticks) information for this axis.
    */
-  virtual void getLabelTicks(std::vector<TickLabel>& ticks, int segment) const;
+  virtual void getLabelTicks(std::vector<TickLabel>& ticks, int segment, int zoomLevel) const;
+
+  /*! \brief Returns the Date format 
+   */
+  virtual WString autoDateFormat(const WDateTime& dt, DateTimeUnit unit, bool atTick) const;
 
 private:
-  enum DateTimeUnit { Seconds, Minutes, Hours, Days, Months, Years };
 
   WAbstractChartImplementation *chart_;
   Axis             axis_;
@@ -652,6 +797,13 @@ private:
   WFlags<AxisValue> roundLimits_;
   double           segmentMargin_;
   double           titleOffset_;
+  WPen             textPen_;
+  Orientation      titleOrientation_;
+  double	   maxZoom_;
+  double	   initialZoom_;
+  double           initialPan_;
+  int              padding_;
+  TickDirection    tickDirection_;
 
   // for 3D charts, don't call update when the labelangle is tempor. changed
   bool             renderingMirror_;
@@ -688,7 +840,7 @@ private:
   double mapToDevice(const boost::any& value, int segment = 0) const;
   double mapToDevice(double value, int segment = 0) const;
 
-  long getDateNumber(Wt::WDateTime dt) const;
+  long long getDateNumber(Wt::WDateTime dt) const;
 
   friend class WCartesianChart;
   friend class WCartesian3DChart;

@@ -10,6 +10,7 @@
 #include <Wt/WLength>
 #include <Wt/WColor>
 #include <Wt/WGradient>
+#include <Wt/WJavaScriptExposableObject>
 
 namespace Wt {
 
@@ -24,11 +25,27 @@ namespace Wt {
  * pen width is modified by the \link WPainter::worldTransform()
  * transformation\endlink set on the painter.
  *
- * \sa WPainter::setPen(), WBrush
+ * <h3>JavaScript exposability</h3>
+ *
+ * A %WPen is JavaScript exposable. If a %WPen \link isJavaScriptBound()
+ * is JavaScript bound\endlink, it can be accessed in your custom JavaScript
+ * code through \link WJavaScriptHandle::jsRef() its handle's jsRef()\endlink.
+ * At the moment, only the color() property is exposed, e.g. a pen
+ * with the color WColor(10,20,30,255) will be represented in JavaScript as:
+ * \code
+ * {
+ *   color: [10,20,30,255]
+ * }
+ * \endcode
+ *
+ * \warning A %WPen that is JavaScript exposed should be modified only through its \link WJavaScriptHandle handle\endlink.
+ *	    Any attempt at modifying it will cause an exception to be thrown.
+ *
+ * \sa WPainter::setPen(), WBrush, WPaintedWidget::createJSPen()
  *
  * \ingroup painting
  */
-class WT_API WPen
+class WT_API WPen : public WJavaScriptExposableObject
 {
 public:
   /*! \brief Creates a black cosmetic pen.
@@ -87,6 +104,8 @@ public:
   WPen clone() const;
 #endif
 
+  WPen& operator=(const WPen& rhs);
+
   /*! \brief Comparison operator.
    *
    * Returns \c true if the pens are exactly the same.
@@ -103,6 +122,8 @@ public:
    *
    * The pen style determines the pattern with which the pen is
    * rendered.
+   *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setStyle(PenStyle style);
 
@@ -115,6 +136,8 @@ public:
   /*! \brief Sets the style for rendering line ends.
    *
    * The cap style configures how line ends are rendered.
+   *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setCapStyle(PenCapStyle style);
 
@@ -128,6 +151,8 @@ public:
    *
    * The join style configures how corners are rendered between
    * different segments of a poly-line, rectange or painter path.
+   *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setJoinStyle(PenJoinStyle style);
 
@@ -140,6 +165,8 @@ public:
   /*! \brief Sets the pen width.
    *
    * A pen width \p must be specified using WLength::Pixel units.
+   *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setWidth(const WLength& width);
 
@@ -150,6 +177,8 @@ public:
   const WLength& width() const { return width_; }
 
   /*! \brief Sets the pen color.
+   *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
    *
    * \a setGradient()
    */
@@ -163,6 +192,8 @@ public:
 
   /*! \brief Sets the pen color as a gradient.
    *
+   * \throws WException if the pen \link isJavaScriptBound() is JavaScript bound\endlink
+   *
    * \sa setColor()
    */
   void setGradient(const WGradient& gradient);
@@ -172,6 +203,8 @@ public:
    * \sa setGradient()
    */
   const WGradient& gradient() const { return gradient_; }
+
+  virtual std::string jsValue() const WT_CXX11ONLY(override) ;
 
 private:
   PenStyle penStyle_;

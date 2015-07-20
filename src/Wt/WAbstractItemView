@@ -402,6 +402,12 @@ public:
    */
   void setSelectedIndexes(const WModelIndexSet& indexes);
 
+  /*! \brief Clears the selection.
+   *
+   * \sa setSelectedIndexes()
+   */
+  void clearSelection();
+
   /*! \brief Selects a single item.
    *
    * \sa setSelectedIndexes(), selectionModel()
@@ -783,6 +789,22 @@ public:
    */
   Signal<int, WMouseEvent> &headerDoubleClicked() { return headerDblClicked_; }
 
+  /*! \brief %Signal emitted when a mouse button is pressed on a header item
+   *
+   * The argument that is passed is the column number.
+   *
+   * \sa headerMouseWentDownUp()
+   */
+  Signal<int, WMouseEvent>& headerMouseWentDown() { return headerMouseWentDown_; }
+
+  /*! \brief %Signal emitted when a mouse button is released on a header item
+   *
+   * The argument that is passed is the column number.
+   *
+   * \sa headerMouseWentDown()
+   */
+  Signal<int, WMouseEvent>& headerMouseWentUp() { return headerMouseWentUp_; }
+
   /*! \brief Signals when scrolling.
    *
    *  \note Works only if ajax is available.
@@ -835,6 +857,39 @@ public:
   bool column1Fixed() const { return rowHeaderCount_ == 1; }
 
   virtual void setObjectName(const std::string& name);
+  
+  /*! \brief Event signal emitted when a keyboard key is pushed down.
+   *
+   * The keyWentDown signal is the first signal emitted when a key is
+   * pressed (before the keyPressed signal). Unlike keyPressed()
+   * however it is also emitted for modifier keys (such as "shift",
+   * "control", ...) or keyboard navigation keys that do not have a
+   * corresponding character.
+   *
+   *
+   * \sa keyPressed(), keyWentUp()
+   */
+  EventSignal<WKeyEvent>& keyWentDown();
+
+  /*! \brief Event signal emitted when a "character" was entered.
+   *
+   * The keyPressed signal is emitted when a key is pressed, and a
+   * character is entered. Unlike keyWentDown(), it is emitted only
+   * for key presses that result in a character being entered, and
+   * thus not for modifier keys or keyboard navigation keys.
+   *
+   * \sa keyWentDown()
+   */
+  EventSignal<WKeyEvent>& keyPressed();
+    
+  /*! \brief Event signal emitted when a keyboard key is released.
+   *
+   * This is the counter-part of the keyWentDown() event. Every
+   * key-down has its corresponding key-up.
+   *
+   * \sa keyWentDown()
+   */
+  EventSignal<WKeyEvent>& keyWentUp();
 
 protected:
   /*! \brief Creates a new item view.
@@ -899,6 +954,7 @@ protected:
    * listen to the pageChanged() signal to react to changes.
    */
   virtual WWidget *createPageNavigationBar();
+  
 
 protected:
   struct ColumnInfo {
@@ -996,6 +1052,7 @@ protected:
    */
   virtual void handleMouseUp(const WModelIndex& index,
 			     const WMouseEvent& event);
+  
 
   virtual bool internalSelect(const WModelIndex& index, SelectionFlag option);
 
@@ -1041,7 +1098,7 @@ private:
   WString computedDragMimeType_;
   bool sortEnabled_;
 
-  JSignal<int, int>    columnWidthChanged_;
+  JSignal<int, int> columnWidthChanged_;
   Signal<int, WLength> columnResized_;
 
   WCssTemplateRule *headerHeightRule_;
@@ -1050,8 +1107,6 @@ private:
   
   WSignalMapper<int> *clickedForExpandMapper_, *clickedForCollapseMapper_;
 
-//  WSignalMapper<int, WMouseEvent> *headerDblClickedMapper_,
-//    *headerClickedMapper_;
   bool alternatingRowColors_;
 
   JSlot resizeHandleMDownJS_;
@@ -1059,8 +1114,10 @@ private:
   typedef std::map<WModelIndex, Editor> EditorMap;
   EditorMap editedItems_;
 
-  Signal<int, WMouseEvent> headerDblClicked_;
   Signal<int, WMouseEvent> headerClicked_;
+  Signal<int, WMouseEvent> headerDblClicked_;
+  Signal<int, WMouseEvent> headerMouseWentDown_;
+  Signal<int, WMouseEvent> headerMouseWentUp_;
 
   Signal<WModelIndex, WMouseEvent> clicked_;
   Signal<WModelIndex, WMouseEvent> doubleClicked_;
@@ -1081,7 +1138,6 @@ private:
 
   void selectionHandleClick(const WModelIndex& index,
 			    WFlags<KeyboardModifier> modifiers);
-  void clearSelection();
   void extendSelection(const WModelIndex& index);
   virtual void selectRange(const WModelIndex& first, const WModelIndex& last)
     = 0;
@@ -1089,6 +1145,8 @@ private:
   void checkDragSelection();
   void configureModelDragDrop();
 
+  void handleHeaderMouseDown(int columnid, WMouseEvent event);
+  void handleHeaderMouseUp(int columnid, WMouseEvent event);
   void handleHeaderClicked(int columnid, WMouseEvent event);
   void handleHeaderDblClicked(int columnid, WMouseEvent event);
   void toggleSortColumn(int columnid);

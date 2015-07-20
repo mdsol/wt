@@ -16,8 +16,8 @@
 #define WT_INCLUDED_VERSION Wt_3_3_4
 
 #define RUNDIR "/var/run/wt"
-#define WT_CONFIG_XML "/Users/tho/agit/wt/build/etc/wt_config.xml"
-#define WTHTTP_CONFIGURATION "/Users/tho/agit/wt/build/etc/wthttpd"
+#define WT_CONFIG_XML "/Users/jtomson/sandbox/anson_wt/build-ios/etc/wt_config.xml"
+#define WTHTTP_CONFIGURATION "/Users/jtomson/sandbox/anson_wt/build-ios/etc/wthttpd"
 
 
 #define WT_STATIC
@@ -40,6 +40,7 @@
 /* #undef WT_NO_STD_WSTRING */
 /* #undef WT_USE_OPENGL */
 /* #undef WT_DEBUG_ENABLED */
+#define WT_THREADED
 
 #define WT_USE_BOOST_SIGNALS
 /* #undef WT_USE_BOOST_SIGNALS2 */

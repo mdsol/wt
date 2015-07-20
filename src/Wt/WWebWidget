@@ -50,7 +50,8 @@ enum DomElementType {
   DomElement_AUDIO, DomElement_VIDEO, DomElement_SOURCE,
 
   DomElement_B, DomElement_STRONG, DomElement_EM, DomElement_I, DomElement_HR,
-  DomElement_UNKNOWN
+  DomElement_UNKNOWN,
+  DomElement_OTHER
 };
 
 class WCssDecorationStyle;
@@ -159,7 +160,21 @@ public:
   virtual void doJavaScript(const std::string& javascript);
   virtual const std::string id() const;
 
+#ifdef WT_TARGET_JAVA
+  /*! \brief Create DOM element for widget
+   *
+   * This is an internal function, and should not be called directly,
+   * or be overridden!
+   */
+#endif
   virtual DomElement *createDomElement(WApplication *app);
+#ifdef WT_TARGET_JAVA
+  /*! \brief Get DOM changes for this widget
+   *
+   * This is an internal function, and should not be called directly,
+   * or be overridden!
+   */
+#endif
   virtual void getDomChanges(std::vector<DomElement *>& result,
 			     WApplication *app);
   virtual DomElementType domElementType() const = 0;
@@ -186,6 +201,24 @@ public:
    * \sa WApplication::setTwoPhaseRenderingThreshold()
    */
   void setLoadLaterWhenInvisible(bool);
+  
+  /*!
+   * \brief returns the current html tag name
+   * 
+   * \sa setHtmlTagName()
+   */
+  std::string htmlTagName() const;
+
+  /*!
+   * \brief set the custom HTML tag name
+   * 
+   * The custom tag will replace the actual tag. 
+   * The tag is not tested to see if
+   * it is a valid one and a closing tag will always be added.
+   *
+   * \sa htmlTagName()
+   */
+  void setHtmlTagName(const std::string & tag);
 
   /*! \brief Escape HTML control characters in the text, to display literally (<b>deprecated</b>).
    *
@@ -292,7 +325,7 @@ protected:
   virtual void updateDom(DomElement& element, bool all);
   virtual bool domCanBeSaved() const;
   virtual void propagateRenderOk(bool deep = true);
-  virtual std::string renderRemoveJs();
+  virtual std::string renderRemoveJs(bool recursive);
 
   virtual void propagateSetEnabled(bool enabled);
   virtual bool isStubbed() const;
@@ -350,6 +383,8 @@ private:
 
   static const char *FOCUS_SIGNAL;
   static const char *BLUR_SIGNAL;
+
+  std::string elementTagName_;
 
 #ifndef WT_TARGET_JAVA
   static const std::bitset<31> AllChangeFlags;
