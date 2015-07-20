@@ -8,6 +8,7 @@
 #define WRECTF_H_
 
 #include <Wt/WDllDefs.h>
+#include <Wt/WJavaScriptExposableObject>
 
 namespace Wt {
 
@@ -18,9 +19,25 @@ class WPointF;
  *
  * The rectangle is defined by a top-left point and a width and height.
  *
+ * <h3>JavaScript exposability</h3>
+ *
+ * A %WRectF is JavaScript exposable. If a %WRectF \link isJavaScriptBound()
+ * is JavaScript bound\endlink, it can be accessed in your custom JavaScript
+ * code through \link WJavaScriptHandle::jsRef() its handle's jsRef()\endlink.
+ * A rectangle is represented in JavaScript as an array of four elements (x,y,width,height), e.g. a rectangle
+ * WRectF(10,20,30,40) will be represented in JavaScript as:
+ * \code
+ * [10, 20, 30, 40]
+ * \endcode
+ *
+ * \warning A %WRectF that is JavaScript exposed should be modified only through its \link WJavaScriptHandle handle\endlink.
+ *	    Any attempt at modifying it will cause an exception to be thrown.
+ *
+ * \sa WPaintedWidget::createJSRect()
+ *
  * \ingroup painting
  */
-class WT_API WRectF
+class WT_API WRectF : public WJavaScriptExposableObject
 {
 public:
   /*! \brief Default constructor.
@@ -37,6 +54,8 @@ public:
    * and size \p width x \p height.
    */
   WRectF(double x, double y, double width, double height);
+
+  WRectF(const WRectF& other);
 
   /*! \brief Creates a rectangle.
    *
@@ -55,12 +74,20 @@ public:
   WRectF& operator= (const WRectF& rhs);
 #endif // WT_TARGET_JAVA
 
+#ifdef WT_TARGET_JAVA
+  WRectF clone() const;
+#endif
+
+  virtual ~WRectF();
+
   /*! \brief Comparison operator.
    */
   bool operator== (const WRectF& rhs) const;
   bool operator!= (const WRectF& rhs) const;
 
   /*! \brief Checks for a <i>null</i> rectangle.
+   *
+   * A rectangle that isJavaScriptBound() is never null.
    *
    * \sa WRectF()
    */
@@ -69,6 +96,8 @@ public:
   /*! \brief Determines whether or not this rectangle is empty. 
    *
    * A rectangle is empty if its width and height are zero.
+   *
+   * A rectangle that isJavaScriptBound() is JavaScript bound\endlink is never empty.
    */
   bool isEmpty() const;
 
@@ -76,6 +105,8 @@ public:
    *
    * The right side of the rectangle does not move, and as a result,
    * the rectangle may be resized.
+   *
+   * \throws WException if the rectangle \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setX(double x);
 
@@ -83,6 +114,8 @@ public:
    *
    * The bottom side of the rectangle does not move, and as a result,
    * the rectangle may be resized.
+   *
+   * \throws WException if the rectangle \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setY(double y);
 
@@ -90,6 +123,8 @@ public:
    *
    * The right side of the rectangle may move, but this does not
    * affect the left side.
+   *
+   * \throws WException if the rectangle \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setWidth(double width) { width_ = width; }
 
@@ -97,6 +132,8 @@ public:
    *
    * The bottom side of the rectangle may move, but this does not
    * affect the Y position of the top side.
+   *
+   * \throws WException if the rectangle \link isJavaScriptBound() is JavaScript bound\endlink
    */
   void setHeight(double height) { height_ = height; }
 
@@ -181,10 +218,14 @@ public:
   WPointF bottomRight() const;
 
   /*! \brief Tests if a rectangle contains a point.
+   *
+   * \note This method is not supported if this rectangle isJavaScriptBound()
    */
   bool contains(const WPointF& p) const;
 
   /*! \brief Tests if a rectangle contains a point.
+   *
+   * \note This method is not supported if this rectangle isJavaScriptBound()
    */
   bool contains(double x, double y) const;
 
@@ -193,17 +234,25 @@ public:
   bool intersects(const WRectF& other) const;
 
   /*! \brief Makes the union of to rectangles.
+   *
+   * \note This method is not supported if this rectangle \link isJavaScriptBound() is JavaScript bound\endlink.
    */
   WRectF united(const WRectF& other) const;
 
   /*! \brief Returns a normalized rectangle.
    *
    * A normalized rectangle has a positive width and height.
+   *
+   * This method supports JavaScript bound rectangles.
    */
   WRectF normalized() const;
 
+  virtual std::string jsValue() const WT_CXX11ONLY(override) ;
+
 private:
   double x_, y_, width_, height_;
+
+  friend class WTransform;
 };
 
 }

@@ -10,11 +10,7 @@
 #include "BlogLoginWidget.h"
 
 #include "../model/BlogSession.h"
-#include "../model/Comment.h"
 #include "../model/Post.h"
-#include "../model/Tag.h"
-#include "../model/Token.h"
-#include "../model/User.h"
 
 #include <Wt/WAnchor>
 #include <Wt/WApplication>
@@ -237,7 +233,7 @@ private:
     handlePathChange(wApp->internalPath());
   }
 
-  void handlePathChange(const std::string& path) {
+  void handlePathChange(const std::string& p) {
     WApplication *app = wApp;
 
     if (app->internalPathMatches(basePath_)) {

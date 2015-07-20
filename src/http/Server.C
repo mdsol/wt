@@ -192,6 +192,9 @@ void Server::start()
 
     if (config_.sslClientVerification() == "none") {
       ssl_context_.set_verify_mode(asio::ssl::context::verify_none);
+	} else if (config_.sslClientVerification() == "once") {
+	  ssl_context_.set_verify_mode(asio::ssl::context::verify_client_once);
+      ssl_context_.load_verify_file(config_.sslCaCertificates());
     } else if (config_.sslClientVerification() == "optional") {
       ssl_context_.set_verify_mode(asio::ssl::context::verify_peer);
       ssl_context_.load_verify_file(config_.sslCaCertificates());
@@ -327,6 +330,12 @@ void Server::handlePortSent(const boost::shared_ptr<asio::ip::tcp::socket>& sock
   if (err) {
     LOG_ERROR_S(&wt_, "child process couldn't send listening port: " << err.message());
   }
+  boost::system::error_code ignored_ec;
+  if(socket.get()) {
+	socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored_ec);
+	socket->close();
+  }
+
 }
 
 Server::~Server()

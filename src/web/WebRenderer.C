@@ -111,6 +111,14 @@ WebRenderer::WebRenderer(WebSession& session)
     learning_(false)
 { }
 
+void WebRenderer::setRendered(bool how)
+{
+  if (rendered_ != how) {
+    LOG_DEBUG("setRendered: " << how);
+    rendered_ = how;
+  }
+}
+
 void WebRenderer::setTwoPhaseThreshold(int bytes)
 {
   twoPhaseThreshold_ = bytes;
@@ -198,6 +206,7 @@ bool WebRenderer::ackUpdate(int updateId)
    * delivered ?
    */
   if (updateId == expectedAckId_) {
+    LOG_DEBUG("jsSynced(false) after ackUpdate okay");
     setJSSynced(false);
     ++expectedAckId_;
     return true;
@@ -257,12 +266,16 @@ void WebRenderer::serveResponse(WebResponse& response)
     break;
   case WebResponse::Page:
     initialStyleRendered_ = false;
+    ++pageId_;
     if (session_.app())
       serveMainpage(response);
     else
       serveBootstrap(response);
     break;
   case WebResponse::Script:
+    bool hybridPage = session_.progressiveBoot() || session_.env().ajax();
+    if (!hybridPage)
+      setRendered(false);
     serveMainscript(response);
     break;
   }
@@ -401,7 +414,8 @@ void WebRenderer::serveBootstrap(WebResponse& response)
   DomElement::htmlAttributeValue
     (bootStyleUrl,
      session_.bootstrapUrl(response, WebSession::ClearInternalPath)
-     + "&request=style");
+     + "&request=style&page="
+     + boost::lexical_cast<std::string>(pageId_));
 
   boot.setVar("BOOT_STYLE_URL", bootStyleUrl.str());
 
@@ -415,7 +429,7 @@ void WebRenderer::serveBootstrap(WebResponse& response)
   streamBootContent(response, boot, false);
   boot.stream(out);
 
-  rendered_ = false;
+  setRendered(false);
 
   out.spool(response.out());
 }
@@ -570,8 +584,10 @@ void WebRenderer::serveJavaScriptUpdate(WebResponse& response)
 
     out << collectedJS1_.str() << collectedJS2_.str();
 
-    if (response.isWebSocketRequest() || response.isWebSocketMessage())
+    if (response.isWebSocketMessage()) {
+      LOG_DEBUG("jsSynced(false) after rendering websocket message");
       setJSSynced(false);
+    }
   }
 
   out.spool(response.out());
@@ -715,10 +731,15 @@ void WebRenderer::collectJavaScript()
   Configuration& conf = session_.controller()->configuration();
 
   /*
-   * Pending invisible changes are also collected into JS1.
-   * This is also done in ackUpdate(), but just in case an update was not
-   * acknowledged:
+   * Pending invisible changes are also collected into JS1. This is
+   * also done in ackUpdate(), but just in case an update was not
+   * acknowledged.
+   *
+   * This is also used to render JavaScript that was rendered in asHtml()
+   * in a hybrid page.
    */
+  LOG_DEBUG("Rendering invisible: " << invisibleJS_.str());
+  
   collectedJS1_ << invisibleJS_.str();
   invisibleJS_.clear();
 
@@ -1139,6 +1160,7 @@ void WebRenderer::serveMainAjax(WStringStream& out)
       << "._p_.setFormObjects([" << currentFormObjectsList_ << "]);\n";
   formObjectsChanged_ = false;
 
+  setRendered(true);
   setJSSynced(true);
 
   preLearnStateless(app, collectedJS1_);
@@ -1181,7 +1203,8 @@ void WebRenderer::serveMainAjax(WStringStream& out)
 
 void WebRenderer::setJSSynced(bool invisibleToo)
 {
-  //LOG_DEBUG("setJSSynced: " << invisibleToo);
+  LOG_DEBUG("setJSSynced: " << invisibleToo);
+
   collectedJS1_.clear();
   collectedJS2_.clear();
 
@@ -1240,8 +1263,6 @@ void WebRenderer::renderStyleSheet(WStringStream& out,
 void WebRenderer::serveMainpage(WebResponse& response)
 {
   ++expectedAckId_;
-  ++pageId_;
-
   session_.sessionIdChanged_ = false;
 
   Configuration& conf = session_.controller()->configuration();
@@ -1292,8 +1313,7 @@ void WebRenderer::serveMainpage(WebResponse& response)
    * non-JavaScript versions.
    */
   DomElement *mainElement = mainWebWidget->createSDomElement(app);
-  rendered_ = true;
-
+  setRendered(true);
   setJSSynced(true);
 
   WStringStream styleSheets;
@@ -1372,7 +1392,14 @@ void WebRenderer::serveMainpage(WebResponse& response)
     EscapeOStream js;
     EscapeOStream eout(out);
     mainElement->asHTML(eout, js, timeouts);
-    app->afterLoadJavaScript_ = js.str() + app->afterLoadJavaScript_;
+
+    /*
+     * invisibleJS_ is being streamed as the first JavaScript inside
+     * collectJavaScript(). This is where this belongs since between
+     * the HTML and the script there may already be changes (because
+     * of server push) that delete elements that were rendered.
+     */
+    invisibleJS_ << js.str();
     delete mainElement;
 
     app->domRoot_->doneRerender();
@@ -1674,10 +1701,17 @@ void WebRenderer::collectJS(WStringStream* js)
 	  << "._p_.setCloseMessage(" << app->closeMessage().jsStringLiteral()
 	  << ");\n";
     }
+    
+	if (app->localeChanged_) {
+      *js << app->javaScriptClass()
+	  << "._p_.setLocale(" << WString(app->locale().name()).jsStringLiteral()
+	  << ");\n";
+    }
   }
 
   app->titleChanged_ = false;
   app->closeMessageChanged_ = false;
+  app->localeChanged_ = false;
 
   if (js) {
     int librariesLoaded = loadScriptLibraries(*js, app);

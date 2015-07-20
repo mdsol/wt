@@ -78,6 +78,11 @@ void WServer::setLocalizedStrings(WLocalizedStrings *stringResolver)
   localizedStrings_ = stringResolver;
 }
 
+WLocalizedStrings *WServer::localizedStrings()
+{
+  return localizedStrings_;
+}
+
 void WServer::setIOService(WIOService& ioService)
 {
   if (ioService_) {
@@ -101,10 +106,10 @@ WIOService& WServer::ioService()
 
 void WServer::setAppRoot(const std::string& path)
 {
-  if (configuration_)
-    LOG_ERROR("setAppRoot(): too late, already configured");
-
   appRoot_ = path;
+
+  if (configuration_)
+    configuration_->setAppRoot(path);
 }
 
 std::string WServer::appRoot() const
@@ -126,6 +131,11 @@ void WServer::setConfiguration(const std::string& file,
 
   configurationFile_ = file;
   application_ = application;
+}
+
+WLogger& WServer::logger()
+{
+  return logger_;
 }
 
 WLogEntry WServer::log(const std::string& type) const
@@ -168,6 +178,11 @@ Configuration& WServer::configuration()
   return *configuration_;
 }
 
+WebController *WServer::controller()
+{
+  return webController_;
+}
+
 bool WServer::readConfigurationProperty(const std::string& name,
 					std::string& value) const
 {
@@ -184,6 +199,8 @@ void WServer::post(const std::string& sessionId,
 
 void WServer::postAll(const boost::function<void ()>& function)
 {
+  if(!webController_) return;
+
   std::vector<std::string> sessions = webController_->sessions();
   for (std::vector<std::string>::const_iterator i = sessions.begin();
       i != sessions.end(); ++i) {

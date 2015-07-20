@@ -1,6 +1,7 @@
 #include <Wt/Chart/WCartesianChart>
 #include <Wt/WContainerWidget>
 #include <Wt/WStandardItemModel>
+#include <Wt/WTimer>
 
 #include <cmath>
 

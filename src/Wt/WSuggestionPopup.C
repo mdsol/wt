@@ -65,6 +65,8 @@ WSuggestionPopup::WSuggestionPopup(const Options& options, WObject *parent)
     filtering_(false),
     defaultValue_(-1),
     isDropDownIconUnfiltered_(false),
+    currentItem_(-1),
+    editRole_(UserRole),
     matcherJS_(generateMatcherJS(options)),
     replacerJS_(generateReplacerJS(options)),
     filterModel_(this),
@@ -85,6 +87,8 @@ WSuggestionPopup::WSuggestionPopup(const std::string& matcherJS,
     filtering_(false),
     defaultValue_(-1),
     isDropDownIconUnfiltered_(false),
+    currentItem_(-1),
+    editRole_(UserRole),
     matcherJS_(matcherJS),
     replacerJS_(replacerJS),
     filter_(implementation(), "filter"),
@@ -112,6 +116,7 @@ void WSuggestionPopup::init()
 
   filter_.connect(this, &WSuggestionPopup::doFilter);
   jactivated_.connect(this, &WSuggestionPopup::doActivate);
+
 }
 
 void WSuggestionPopup::defineJavaScript()
@@ -223,7 +228,7 @@ void WSuggestionPopup::modelRowsInserted(const WModelIndex& parent,
     WAnchor *anchor = new WAnchor(line);
     WText *value = new WText(asString(d), format, anchor);
 
-    boost::any d2 = index.data(UserRole);
+    boost::any d2 = index.data(editRole_);
     if (d2.empty())
       d2 = d;
 
@@ -271,7 +276,7 @@ void WSuggestionPopup::modelDataChanged(const WModelIndex& topLeft,
     TextFormat format = index.flags() & ItemIsXHTMLText ? XHTMLText : PlainText;
     value->setTextFormat(format);
 
-    boost::any d2 = model_->data(i, modelColumn_, UserRole);
+    boost::any d2 = model_->data(i, modelColumn_, editRole());
     if (d2.empty())
       d2 = d;
 
@@ -339,7 +344,8 @@ void WSuggestionPopup::addSuggestion(const WString& suggestionText,
   if (model_->insertRow(row)) {
     model_->setData(row, modelColumn_, boost::any(suggestionText), DisplayRole);
     if (!suggestionValue.empty())
-      model_->setData(row, modelColumn_, boost::any(suggestionValue), UserRole);
+      model_->setData(row, modelColumn_, boost::any(suggestionValue),
+		      editRole());
   }
 }
 
@@ -386,15 +392,21 @@ void WSuggestionPopup::doActivate(std::string itemId, std::string editId)
       break;
     }
 
-  if (edit == 0)
+  if (edit == 0) {
     LOG_ERROR("activate from bogus editor");
+	currentItem_ = -1;
+	return;
+  }
 
   for (int i = 0; i < impl_->count(); ++i)
     if (impl_->widget(i)->id() == itemId) {
+	  currentItem_ = i;
       activated_.emit(i, edit);
+	  if(edit)
+		edit->changed().emit();
       return;
     }
-
+  currentItem_ = -1;
   LOG_ERROR("activate for bogus item");
 }
 

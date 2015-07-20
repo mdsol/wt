@@ -38,6 +38,7 @@ const char *WInteractWidget::MOUSE_OVER_SIGNAL = "M_mouseover";
 const char *WInteractWidget::MOUSE_MOVE_SIGNAL = "M_mousemove";
 const char *WInteractWidget::MOUSE_DRAG_SIGNAL = "M_mousedrag";
 const char *WInteractWidget::MOUSE_WHEEL_SIGNAL = "mousewheel";
+const char *WInteractWidget::WHEEL_SIGNAL = "wheel";
 const char *WInteractWidget::TOUCH_START_SIGNAL = "touchstart";
 const char *WInteractWidget::TOUCH_MOVE_SIGNAL = "touchmove";
 const char *WInteractWidget::TOUCH_END_SIGNAL = "touchend";
@@ -140,7 +141,11 @@ EventSignal<WMouseEvent>& WInteractWidget::mouseDragged()
 
 EventSignal<WMouseEvent>& WInteractWidget::mouseWheel()
 {
-  return *mouseEventSignal(MOUSE_WHEEL_SIGNAL, true);
+  if (WApplication::instance()->environment().agentIsIElt(9)) {
+    return *mouseEventSignal(MOUSE_WHEEL_SIGNAL, true);
+  } else {
+    return *mouseEventSignal(WHEEL_SIGNAL, true);
+  }
 }
 
 EventSignal<WTouchEvent>& WInteractWidget::touchStarted()
@@ -403,11 +408,8 @@ void WInteractWidget::updateDom(DomElement& element, bool all)
 	}
       }
 
-      js << "if(o.wtClickTimeout) {"
-	       << "clearTimeout(o.wtClickTimeout);"
-	       << "o.wtClickTimeout = null;";
-
-      js << mouseDblClick->javaScript();
+      js << "if(" WT_CLASS ".isDblClick(o, e)) {"
+	 << mouseDblClick->javaScript();
 
       if (mouseDblClick->isExposedSignal())
 	js << app->javaScriptClass()
@@ -420,8 +422,9 @@ void WInteractWidget::updateDom(DomElement& element, bool all)
 	"}else{"
 	"""if (" WT_CLASS ".isIElt9 && document.createEventObject) "
 	""  "e = document.createEventObject(e);"
+	"""o.wtE1 = e;"
 	"""o.wtClickTimeout = setTimeout(function() {"
-	""   "o.wtClickTimeout = null;";
+	""   "o.wtClickTimeout = null; o.wtE1 = null;";
 
       if (mouseClick) {
 	js << mouseClick->javaScript();

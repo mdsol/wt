@@ -65,23 +65,20 @@ protected:
       "function load() { ";
 
     if (triggerUpdate || request.tooLarge()) {
-      o << "if (window.parent."
-	<< WApplication::instance()->javaScriptClass() << ") ";
-
       if (triggerUpdate) {
 	LOG_DEBUG("Resource handleRequest(): signaling uploaded");
 
-	o << "window.parent."
-	  << WApplication::instance()->javaScriptClass()
-	  << "._p_.update(null, '"
-	  << fileUpload_->uploaded().encodeCmd() << "', null, true);";
+	o << "window.parent.postMessage("
+	  << "{ fu: '" << fileUpload_->id() << "',"
+	  << "  signal: '"
+	  << fileUpload_->uploaded().encodeCmd() << "'}, '*');";
       } else if (request.tooLarge()) {
 	LOG_DEBUG("Resource handleRequest(): signaling file-too-large");
 
-	o << "window.parent."
-	  << WApplication::instance()->javaScriptClass()
-	  << "._p_.update(null, '"
-	  << fileUpload_->fileTooLargeImpl().encodeCmd() << "', null, true);";
+	o << "window.parent.postMessage("
+	  << "{ fu: '" << fileUpload_->id() << "',"
+	  << "  signal: '"
+	  << fileUpload_->fileTooLargeImpl().encodeCmd() << "'}, '*');";
       }
     } else {
       LOG_DEBUG("Resource handleRequest(): no signal");
@@ -428,6 +425,13 @@ DomElement *WFileUpload::createDomElement(WApplication *app)
 
     form->addChild(input);
 
+    doJavaScript("window.addEventListener('message', function(event) {"
+		 """if (" + jsRef() + ".action.indexOf(event.origin) === 0) {"
+		 ""  "if (event.data.fu == '" + id() + "')"
+		 +      app->javaScriptClass()
+		 +      "._p_.update(null, event.data.signal, null, true);"
+		 """}"
+		 "}, false);");
   } else {
     result->setAttribute("type", "file");
     if (flags_.test(BIT_MULTIPLE))

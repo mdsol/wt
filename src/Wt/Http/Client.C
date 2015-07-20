@@ -49,6 +49,7 @@ public:
 
   Impl(WIOService& ioService, WServer *server, const std::string& sessionId)
     : ioService_(ioService),
+      strand_(ioService),
       resolver_(ioService_),
       timer_(ioService_),
       server_(server),
@@ -102,20 +103,18 @@ public:
     tcp::resolver::query query(server, boost::lexical_cast<std::string>(port));
 
     startTimer();
-    resolver_.async_resolve(query,
-			    boost::bind(&Impl::handleResolve,
-					shared_from_this(),
-					boost::asio::placeholders::error,
-					boost::asio::placeholders::iterator));
+    resolver_.async_resolve
+      (query,
+       strand_.wrap(boost::bind(&Impl::handleResolve,
+				shared_from_this(),
+				boost::asio::placeholders::error,
+				boost::asio::placeholders::iterator)));
   }
 
-  void stop()
+  void asyncStop()
   {
-    if (socket().is_open()) {
-      boost::system::error_code ignored_ec;
-      socket().shutdown(tcp::socket::shutdown_both, ignored_ec);
-      socket().close();
-    }
+    ioService_.post
+      (strand_.wrap(boost::bind(&Impl::stop, shared_from_this())));
   }
 
   Signal<boost::system::error_code, Message>& done() { return done_; }
@@ -138,20 +137,40 @@ protected:
   virtual void asyncRead(const IOHandler& handler) = 0;
 
 private:
+  void stop()
+  {
+    /* Within strand */
+
+    try {
+      if (socket().is_open()) {
+	boost::system::error_code ignored_ec;
+	socket().shutdown(tcp::socket::shutdown_both, ignored_ec);
+	socket().close();
+      }
+    } catch (std::exception& e) {
+      LOG_INFO("Client::abort(), stop(), ignoring error: " << e.what());
+    }
+  }
+
   void startTimer()
   {
     timer_.expires_from_now(boost::posix_time::seconds(timeout_));
-    timer_.async_wait(boost::bind(&Impl::timeout, shared_from_this(),
-				  boost::asio::placeholders::error));
+    timer_.async_wait
+      (strand_.wrap(boost::bind(&Impl::timeout, shared_from_this(),
+				boost::asio::placeholders::error)));
   }
 
   void cancelTimer()
   {
+    /* Within strand */
+
     timer_.cancel();
   }
 
   void timeout(const boost::system::error_code& e)
   {
+    /* Within strand */
+
     if (e != boost::asio::error::operation_aborted) {
       boost::system::error_code ignored_ec;
       socket().shutdown(boost::asio::ip::tcp::socket::shutdown_both,
@@ -164,6 +183,8 @@ private:
   void handleResolve(const boost::system::error_code& err,
 		     tcp::resolver::iterator endpoint_iterator)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
@@ -174,10 +195,10 @@ private:
 
       startTimer();
       asyncConnect(endpoint,
-		   boost::bind(&Impl::handleConnect,
-			       shared_from_this(),
-			       boost::asio::placeholders::error,
-			       ++endpoint_iterator));
+		   strand_.wrap(boost::bind(&Impl::handleConnect,
+					    shared_from_this(),
+					    boost::asio::placeholders::error,
+					    ++endpoint_iterator)));
     } else {
       err_ = err;
       complete();
@@ -187,14 +208,17 @@ private:
   void handleConnect(const boost::system::error_code& err,
 		     tcp::resolver::iterator endpoint_iterator)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
       // The connection was successful. Do the handshake (SSL only)
       startTimer();
-      asyncHandshake(boost::bind(&Impl::handleHandshake,
-				 shared_from_this(),
-				 boost::asio::placeholders::error));
+      asyncHandshake
+	(strand_.wrap(boost::bind(&Impl::handleHandshake,
+				  shared_from_this(),
+				  boost::asio::placeholders::error)));
     } else if (endpoint_iterator != tcp::resolver::iterator()) {
       // The connection failed. Try the next endpoint in the list.
       socket().close();
@@ -208,16 +232,19 @@ private:
 
   void handleHandshake(const boost::system::error_code& err)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
       // The handshake was successful. Send the request.
       startTimer();
       asyncWriteRequest
-	(boost::bind(&Impl::handleWriteRequest,
-		     shared_from_this(),
-		     boost::asio::placeholders::error,
-		     boost::asio::placeholders::bytes_transferred));
+	(strand_.wrap
+	 (boost::bind(&Impl::handleWriteRequest,
+		      shared_from_this(),
+		      boost::asio::placeholders::error,
+		      boost::asio::placeholders::bytes_transferred)));
     } else {
       err_ = err;
       complete();
@@ -227,16 +254,20 @@ private:
   void handleWriteRequest(const boost::system::error_code& err,
 			  const std::size_t&)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
       // Read the response status line.
       startTimer();
-      asyncReadUntil("\r\n",
-		     boost::bind(&Impl::handleReadStatusLine,
-				 shared_from_this(),
-				 boost::asio::placeholders::error,
-				 boost::asio::placeholders::bytes_transferred));
+      asyncReadUntil
+	("\r\n",
+	 strand_.wrap
+	 (boost::bind(&Impl::handleReadStatusLine,
+		      shared_from_this(),
+		      boost::asio::placeholders::error,
+		      boost::asio::placeholders::bytes_transferred)));
     } else {
       err_ = err;
       complete();
@@ -259,6 +290,8 @@ private:
   void handleReadStatusLine(const boost::system::error_code& err,
 			    const std::size_t& s)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
@@ -286,11 +319,13 @@ private:
 
       // Read the response headers, which are terminated by a blank line.
       startTimer();
-      asyncReadUntil("\r\n\r\n",
-		     boost::bind(&Impl::handleReadHeaders,
-				 shared_from_this(),
-				 boost::asio::placeholders::error,
-				 boost::asio::placeholders::bytes_transferred));
+      asyncReadUntil
+	("\r\n\r\n",
+	 strand_.wrap
+	 (boost::bind(&Impl::handleReadHeaders,
+		      shared_from_this(),
+		      boost::asio::placeholders::error,
+		      boost::asio::placeholders::bytes_transferred)));
     } else {
       err_ = err;
       complete();
@@ -300,6 +335,8 @@ private:
   void handleReadHeaders(const boost::system::error_code& err,
 			 const std::size_t& s)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
@@ -346,10 +383,11 @@ private:
 
       // Start reading remaining data until EOF.
       startTimer();
-      asyncRead(boost::bind(&Impl::handleReadContent,
-			    shared_from_this(),
-			    boost::asio::placeholders::error,
-			    boost::asio::placeholders::bytes_transferred));
+      asyncRead(strand_.wrap
+		(boost::bind(&Impl::handleReadContent,
+			     shared_from_this(),
+			     boost::asio::placeholders::error,
+			     boost::asio::placeholders::bytes_transferred)));
     } else {
       err_ = err;
       complete();
@@ -359,6 +397,8 @@ private:
   void handleReadContent(const boost::system::error_code& err,
 			 const std::size_t& s)
   {
+    /* Within strand */
+
     cancelTimer();
 
     if (!err) {
@@ -374,12 +414,16 @@ private:
 
       // Continue reading remaining data until EOF.
       startTimer();
-      asyncRead(boost::bind(&Impl::handleReadContent,
-			    shared_from_this(),
-			    boost::asio::placeholders::error,
-			    boost::asio::placeholders::bytes_transferred));
+      asyncRead
+	(strand_.wrap
+	 (boost::bind(&Impl::handleReadContent,
+		      shared_from_this(),
+		      boost::asio::placeholders::error,
+		      boost::asio::placeholders::bytes_transferred)));
     } else if (err != boost::asio::error::eof
 	       && err != boost::asio::error::shut_down
+	       && err != boost::asio::error::bad_descriptor
+	       && err != boost::asio::error::operation_aborted
 	       && err.value() != 335544539) {
       err_ = err;
       complete();
@@ -499,6 +543,7 @@ private:
 
   void complete()
   {
+    stop();
     if (server_)
       server_->post(sessionId_,
 		    boost::bind(&Impl::emitDone, shared_from_this()));
@@ -533,6 +578,7 @@ private:
 
 protected:
   WIOService& ioService_;
+  boost::asio::strand strand_;
   tcp::resolver resolver_;
   boost::asio::streambuf requestBuf_;
   boost::asio::streambuf responseBuf_;
@@ -707,7 +753,7 @@ void Client::setSslCertificateVerificationEnabled(bool enabled)
 void Client::abort()
 {
   if (impl_)
-    impl_->stop();
+    impl_->asyncStop();
 
   impl_.reset();
   redirectCount_ = 0;
@@ -826,7 +872,7 @@ bool Client::request(Http::Method method, const std::string& url,
 
   if (followRedirect()) {
     impl_->done().connect(boost::bind(&Client::handleRedirect,
-				      this, method, _1, _2));
+				      this, method, _1, _2, message));
   } else {
     impl_->done().connect(this, &Client::emitDone);
   }
@@ -874,7 +920,7 @@ void Client::setMaxRedirects(int maxRedirects)
   maxRedirects_ = maxRedirects;
 }
 
-void Client::handleRedirect(Http::Method method, boost::system::error_code err, const Message& response)
+void Client::handleRedirect(Http::Method method, boost::system::error_code err, const Message& response, const Message& request)
 {
   int status = response.status();
   // Status codes 303 and 307 are implemented, although this should not
@@ -884,7 +930,7 @@ void Client::handleRedirect(Http::Method method, boost::system::error_code err, 
     ++ redirectCount_;
     if (newUrl) {
       if (redirectCount_ <= maxRedirects_) {
-	get(*newUrl);
+	get(*newUrl, request.headers());
 	return;
       } else {
 	LOG_WARN("Redirect count of " << maxRedirects_ << " exceeded! Redirect URL: " << *newUrl);

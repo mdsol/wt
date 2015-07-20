@@ -77,7 +77,10 @@ enum Property { PropertyInnerHTML, PropertyAddedInnerHTML,
 		PropertyStyleVisibility, PropertyStyleDisplay,
 
 		/* CSS 3 */
-		PropertyStyleBoxSizing };
+		PropertyStyleBoxSizing,
+
+		/* Keep as last, e.g. for bitset sizing. Otherwise, unused. */
+		PropertyLastPlusOne };
 
 /*! \class DomElement web/DomElement web/DomElement
  *  \brief Class to represent a client-side DOM element (proxy).
@@ -122,6 +125,10 @@ public:
   /*! \brief Destructor.
    */
   ~DomElement();
+
+  /*! \brief set dom element custom tag name 
+   */
+  void setDomElementTagName(const std::string& name);
 
   /*! \brief Low-level URL encoding function.
    */
@@ -566,6 +573,7 @@ private:
   std::vector<DomElement *> updatedChildren_;
   EStream childrenHtml_;
   TimeoutList timeouts_;
+  std::string elementTagName_;
 
   static int nextId_;
 

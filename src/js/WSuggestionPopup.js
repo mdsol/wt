@@ -223,7 +223,6 @@ WT_DECLARE_WT_MEMBER
    this.filtered = function(f, partial) {
      filter = f;
      filterPartial = partial;
-
      self.refilter(lastFilterValue);
    };
 
@@ -240,6 +239,12 @@ WT_DECLARE_WT_MEMBER
     * Refilter the current selection list based on the edit value.
     */
    this.refilter = function(value) {
+	 if(!editId) {
+	   //If edit is null we probably have already choosen a suggestion and 
+	   //we therefore don't need to refilter!
+	   return;
+	 }
+
      var sel = selId ? WT.getElement(selId) : null,
          edit = WT.getElement(editId),
          matcher = matcherJS(edit),
@@ -339,9 +344,10 @@ WT_DECLARE_WT_MEMBER
          || event.keyCode == key_right) {
        hidePopup();
      } else {
-       if (edit.value != lastFilterValue)
-	 self.refilter(edit.value);
-       else {
+       if (edit.value != lastFilterValue) {
+		 editId = edit.id;
+		 self.refilter(edit.value);
+	   } else {
 	 var sel = selId ? WT.getElement(selId) : null;
 	 if (sel)
 	   scrollToSelected(sel);

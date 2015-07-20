@@ -22,6 +22,7 @@ typedef std::map<std::string, boost::any> SettingsMapType;
 WTextEdit::WTextEdit(WContainerWidget *parent)
   : WTextArea(parent),
     onChange_(this, "change"),
+    onRender_(this, "render"),
     contentChanged_(false)
 {
   init();
@@ -30,6 +31,7 @@ WTextEdit::WTextEdit(WContainerWidget *parent)
 WTextEdit::WTextEdit(const WT_USTRING& text, WContainerWidget *parent)
   : WTextArea(text, parent),
     onChange_(this, "change"),
+    onRender_(this, "render"),
     contentChanged_(false)
 {
   init();
@@ -140,12 +142,15 @@ const std::string WTextEdit::toolBar(int i) const
 		  (setting + boost::lexical_cast<std::string>(i + 1))).toUTF8();
 }
 
-std::string WTextEdit::renderRemoveJs()
+std::string WTextEdit::renderRemoveJs(bool recursive)
 {
-  if (isRendered())
-    return jsRef() + ".ed.remove();" WT_CLASS ".remove('" + id() + "');";
-  else
-    return WTextArea::renderRemoveJs();
+  if (isRendered()) {
+    std::string result = jsRef() + ".ed.remove();";
+    if (!recursive)
+      result += WT_CLASS ".remove('" + id() + "');";
+    return result;
+  } else
+    return WTextArea::renderRemoveJs(recursive);
 }
 
 int WTextEdit::getTinyMCEVersion()

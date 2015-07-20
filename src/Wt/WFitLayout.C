@@ -4,6 +4,7 @@
  * See the LICENSE file for terms of use.
  */
 
+#include "Wt/WContainerWidget"
 #include "Wt/WFitLayout"
 #include "Wt/WLogger"
 
@@ -12,51 +13,63 @@ namespace Wt {
 LOGGER("WFitLayout");
 
 WFitLayout::WFitLayout(WWidget *parent)
-  : WLayout(),
-    item_(0)
+  : WLayout()
 { 
+  grid_.columns_.push_back(Impl::Grid::Section(0));
+  grid_.rows_.push_back(Impl::Grid::Section(0));
+
+  std::vector<Impl::Grid::Item> items;
+  items.push_back(Impl::Grid::Item());
+  grid_.items_.push_back(items);
+
   if (parent)
     setLayoutInParent(parent);
 }
 
 WFitLayout::~WFitLayout()
+{ }
+
+void WFitLayout::fitWidget(WContainerWidget *container, WWidget *widget)
 {
-  delete item_;
+  WFitLayout *l = new WFitLayout();
+  container->setLayout(l);
+  l->addWidget(widget);
 }
 
 void WFitLayout::addItem(WLayoutItem *item)
 {
-  if (item_) {
+  if (grid_.items_[0][0].item_) {
     LOG_ERROR("addItem(): already have a widget");
     return;
   }
 
-  item_ = item;
+  grid_.items_[0][0].item_ = item;
+
   updateAddItem(item);
 }
 
 void WFitLayout::removeItem(WLayoutItem *item)
 {
-  if (item == item_) {
-    item_ = 0;
+  if (item == grid_.items_[0][0].item_) {
+    grid_.items_[0][0].item_ = 0;
     updateRemoveItem(item);
   }
 }
 
 WLayoutItem *WFitLayout::itemAt(int index) const
 {
-  return item_;
+  return grid_.items_[0][0].item_;
 }
 
 void WFitLayout::clear()
 {
-  clearLayoutItem(item_);
-  item_ = 0;
+  clearLayoutItem(grid_.items_[0][0].item_);
+  grid_.items_[0][0].item_ = 0;
 }
 
 int WFitLayout::indexOf(WLayoutItem *item) const
 {
-  if (item_ == item)
+  if (grid_.items_[0][0].item_ == item)
     return 0;
   else
     return -1;
@@ -64,7 +77,7 @@ int WFitLayout::indexOf(WLayoutItem *item) const
 
 int WFitLayout::count() const
 {
-  return item_ ? 1 : 0;
+  return grid_.items_[0][0].item_ ? 1 : 0;
 }
 
 }

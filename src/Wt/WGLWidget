@@ -2774,6 +2774,9 @@ void uniform2iv(const UniformLocation &location,
    * - <b>mouseDrag(o, event)</b>: Called when the mouse is dragged. \c o is the \c &lt;canvas> (client-side rendering)
    *			    or \c &lt;img> (server-side rendering) element corresponding to this WGLWidget. \c event is
    *			    the \c MouseEvent.
+   * - <b>mouseMove(o, event)</b>: Called when the mouse is moved. \c o is the \c &lt;canvas> (client-side rendering)
+   *			    or \c &lt;img> (server-side rendering) element corresponding to this WGLWidget. \c event is
+   *			    the \c MouseEvent.
    * - <b>mouseWheel(o, event)</b>: Called when the mouse wheel is used. \c o is the \c &lt;canvas> (client-side rendering)
    *			    or \c &lt;img> (server-side rendering) element corresponding to this WGLWidget. \c event is
    *			    the \c MouseEvent.
@@ -2926,7 +2929,7 @@ protected:
   virtual void updateDom(DomElement &element, bool all);
 
   virtual void render(WFlags<RenderFlag> flags);
-  virtual std::string renderRemoveJs();
+  virtual std::string renderRemoveJs(bool recursive);
 
   virtual void layoutSizeChanged(int width, int height);
 
@@ -2978,6 +2981,7 @@ private:
   JSlot mouseWentDownSlot_;
   JSlot mouseWentUpSlot_;
   JSlot mouseDraggedSlot_;
+  JSlot mouseMovedSlot_;
   JSlot mouseWheelSlot_;
   JSlot touchStarted_;
   JSlot touchEnded_;

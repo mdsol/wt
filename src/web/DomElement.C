@@ -206,6 +206,10 @@ DomElement::~DomElement()
   delete insertBefore_;
 }
 
+void DomElement::setDomElementTagName(const std::string& name) {
+  this->elementTagName_ = name;
+}
+
 std::string DomElement::urlEncodeS(const std::string& url,
                                    const std::string &allowed)
 {
@@ -705,9 +709,9 @@ void DomElement::setJavaScriptEvent(EscapeOStream& out,
     out << var_;
   }
 
-  if (eventName == WInteractWidget::MOUSE_WHEEL_SIGNAL
-      && app->environment().agentIsGecko())
-    out << ".addEventListener('DOMMouseScroll', f" << fid << ", false);\n";
+  if (eventName == WInteractWidget::WHEEL_SIGNAL
+      && app->environment().agentIsIE() && app->environment().agent() >= WEnvironment::IE9)
+    out << ".addEventListener('wheel', f" << fid << ", false);\n";
   else
     out << ".on" << const_cast<char *>(eventName) << "=f" << fid << ";\n";
 }
@@ -885,7 +889,9 @@ void DomElement::asHTML(EscapeOStream& out,
     out << "<a href=\"#\" class=\"Wt-wrap\" onclick=";
     fastHtmlAttributeValue(out, attributeValues, clickEvent->second.jsCode);
     out << "><" << elementNames_[renderedType];
-  } else
+  } else if (renderedType == DomElement_OTHER)  // Custom tag name
+	out << '<' << elementTagName_;
+  else
     out << '<' << elementNames_[renderedType];
 
   if (!id_.empty()) {
@@ -905,8 +911,8 @@ void DomElement::asHTML(EscapeOStream& out,
 	 i != eventHandlers_.end(); ++i) {
       if (!i->second.jsCode.empty()) {
 	if (id_ == app->domRoot()->id()
-	    || (i->first == WInteractWidget::MOUSE_WHEEL_SIGNAL
-		&& app->environment().agentIsGecko()))
+	    || (i->first == WInteractWidget::WHEEL_SIGNAL
+		&& app->environment().agentIsIE() && app->environment().agent() >= WEnvironment::IE9))
 	  setJavaScriptEvent(javaScript, i->first, i->second, app);
 	else {
 	  out << " on" << const_cast<char *>(i->first) << '=';
@@ -1031,8 +1037,10 @@ void DomElement::asHTML(EscapeOStream& out,
 	  && childrenToAdd_.empty()
 	  && childrenHtml_.empty())
 	out << "&nbsp;";
-
-      out << "</" << elementNames_[renderedType] << ">";
+	  if( renderedType  == DomElement_OTHER) // Custom tag name
+		out << "</" << elementTagName_ << ">";
+	  else
+		out << "</" << elementNames_[renderedType] << ">";
     } else
       out << " />";
 

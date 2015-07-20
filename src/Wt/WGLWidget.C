@@ -63,6 +63,7 @@ WGLWidget::WGLWidget(WContainerWidget *parent)
   mouseWentDownSlot_("function(o, e){" + this->glObjJsRef() + ".mouseDown(o, e);}", this),
   mouseWentUpSlot_("function(o, e){" + this->glObjJsRef() + ".mouseUp(o, e);}", this),
   mouseDraggedSlot_("function(o, e){" + this->glObjJsRef() + ".mouseDrag(o, e);}", this),
+  mouseMovedSlot_("function(o, e){" + this->glObjJsRef() + ".mouseMove(o, e);}", this),
   mouseWheelSlot_("function(o, e){" + this->glObjJsRef() + ".mouseWheel(o, e);}", this),
   touchStarted_("function(o, e){" + this->glObjJsRef() + ".touchStart(o, e);}", this),
   touchEnded_("function(o, e){" + this->glObjJsRef() + ".touchEnd(o, e);}", this),
@@ -80,6 +81,7 @@ WGLWidget::WGLWidget(WContainerWidget *parent)
   mouseWentDown().connect(mouseWentDownSlot_);
   mouseWentUp().connect(mouseWentUpSlot_);
   mouseDragged().connect(mouseDraggedSlot_);
+  mouseMoved().connect(mouseMovedSlot_);
   mouseWheel().connect(mouseWheelSlot_);
   touchStarted().connect(touchStarted_);
   touchEnded().connect(touchEnded_);
@@ -123,14 +125,14 @@ void WGLWidget::webglNotAvailable()
   webGlNotAvailable_ = true;
 }
 
-std::string WGLWidget::renderRemoveJs()
+std::string WGLWidget::renderRemoveJs(bool recursive)
 {
   if (webGlNotAvailable_) {
     // The canvas was already deleted client-side
-    return alternative_->webWidget()->renderRemoveJs();
+    return alternative_->webWidget()->renderRemoveJs(recursive);
   } else {
     // Nothing special, behave as usual
-    return WInteractWidget::renderRemoveJs();
+    return WInteractWidget::renderRemoveJs(recursive);
   }
 }
 
