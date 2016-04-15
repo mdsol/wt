@@ -11,10 +11,11 @@
 : ${ISIM_SDK:=/Developer/Platforms/iPhoneSimulator.platform/Developer}
 
 CONCURRENT_JOBS=8
-BUILD_DBO_ONLY=false
-BUILD_DBO_COMMAND=``
+BUILD_DBO_ONLY=true
+BUILD_DBO_COMMAND="cd ./src/Wt/Dbo "
 BOOST_FRAMEWORK_PATH=/Users/jtomson/sandbox/babbage/3rdparty/boost-darwin-cook/ios/framework
 SDK_VER=9.3
+SDK_MIN=8.0
 IOS_SDK=$XCODE_ROOT/Platforms/iPhoneOS.platform/Developer
 ISIM_SDK=$XCODE_ROOT/Platforms/iPhoneSimulator.platform/Developer
 IOS_DEV=$XCODE_ROOT/Toolchains/XcodeDefault.xctoolchain
@@ -64,9 +65,7 @@ TMP_DIR=$BUILD_DIR/tmp
        -DENABLE_POSTGRES=OFF \
        -DENABLE_FIREBIRD=OFF \
        -DHTTP_WITH_ZLIB=OFF \
-       -DWT_NO_SPIRIT=1 \
-       -miphoneos-version-min=8.0 \
-       -fembed-bitcode }
+       -DWT_NO_SPIRIT=1 }
 
 abort()
 {
@@ -92,8 +91,8 @@ build-arm64()
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe" \
-       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe" \
+       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
+       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch arm64 -pipe -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
        ../../ && make ) || abort "Failed building for arm64 architecture"
 }
 
@@ -104,8 +103,8 @@ build-armv7()
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$IOS_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe" \
-       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe" \
+       -DCMAKE_C_FLAGS:STRING="-mthumb -fvisibility=hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe -miphoneos-version-min=8.0 -fembed-bitcode" \
+       -DCMAKE_CXX_FLAGS:STRING="-mthumb -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $IOS_SDK/SDKs/iPhoneOS${SDK_VER}.sdk -arch armv7 -pipe -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
        -DCMAKE_OSX_SYSROOT=${IOS_SDK}/SDKs/iPhoneOS${SDK_VER}.sdk \
        ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS}) || abort "Failed building for arm7 architecture"
 }
@@ -117,8 +116,8 @@ build-i386()
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk" \
-       -DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk" \
+       -DCMAKE_C_FLAGS:STRING="-arch i386 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=8.0 -fembed-bitcode" \
+       -DCMAKE_CXX_FLAGS:STRING="-arch i386 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
        -DCMAKE_OSX_SYSROOT=${ISIM_SDK}/SDKs/iPhoneSimulator${SDK_VER}.sdk \
        ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS} && make install) || abort "Failed building for simulator"
 }
@@ -130,8 +129,8 @@ build-x8664()
        $COMMON_CMAKE_FLAGS \
        -DCMAKE_C_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang \
        -DCMAKE_CXX_COMPILER:FILEPATH=$ISIM_DEV/usr/bin/clang++ \
-       -DCMAKE_C_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk" \
-       -DCMAKE_CXX_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk" \
+       -DCMAKE_C_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
+       -DCMAKE_CXX_FLAGS:STRING="-arch x86_64 -fvisibility=hidden -fvisibility-inlines-hidden -isysroot $ISIM_SDK/SDKs/iPhoneSimulator$SDK_VER.sdk -miphoneos-version-min=${SDK_MIN} -fembed-bitcode" \
        -DCMAKE_OSX_SYSROOT=${ISIM_SDK}/SDKs/iPhoneSimulator${SDK_VER}.sdk \
        ../../ && eval ${BUILD_DBO_COMMAND} && make -j${CONCURRENT_JOBS} && make install) || abort "Failed building for simulator"
 }
