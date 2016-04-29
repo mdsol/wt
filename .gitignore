@@ -17,8 +17,5 @@ resources/tiny_mce
 test/interactive
 debug/
 
-
-
-
-
-
+# Unzipped prebuilts
+prebuilt/lib/ios/*.a
